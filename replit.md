@@ -47,11 +47,25 @@ Preferred communication style: Simple, everyday language.
 └── script/           # Build scripts
 ```
 
+### Weather API
+- **External API**: Open-Meteo (free, no API key required)
+- **Endpoint**: GET /api/weather?city={zoneKey}
+- **Response**: { celsius: number, fahrenheit: number }
+- **Caching**: Server-side 10-minute cache, client-side React Query stale time of 10 minutes
+- **Temperature Colors**:
+  - Blue (text-blue-500): <= 0°C (freezing)
+  - Cyan (text-cyan-500): 1-10°C (cold)
+  - Green (text-green-500): 11-18°C (cool)
+  - Yellow (text-yellow-500): 19-24°C (mild)
+  - Orange (text-orange-500): 25-30°C (warm)
+  - Red (text-red-500): > 30°C (hot)
+
 ### Key Design Decisions
 1. **Client-side data persistence**: Timezone preferences stored in localStorage rather than a database, making the app work without authentication
 2. **Shared schema**: Zod schemas shared between client and server for type safety and validation
 3. **Theme system**: CSS custom properties with class-based dark mode switching
 4. **Component architecture**: shadcn/ui components provide consistent, accessible UI primitives
+5. **Weather integration**: Open-Meteo API provides real-time temperatures without API key requirements
 
 ## External Dependencies
 

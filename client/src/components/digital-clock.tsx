@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { MeetingPlannerModal } from "@/components/meeting-planner-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ALL_TIMEZONES, type TimezoneKey } from "@shared/schema";
+import { useWeather, getTemperatureColor } from "@/hooks/use-weather";
 
 interface DigitalClockProps {
   time: Date;
@@ -84,6 +85,9 @@ export function DigitalClock({
   const [isEditing, setIsEditing] = useState(false);
   const [editTime, setEditTime] = useState("");
 
+  // Fetch weather data for this timezone
+  const { data: weather } = useWeather(zoneKey || selectedZoneKey);
+
   function handleTimeClick() {
     if (onTimeUpdate && zoneKey) {
       const currentTime = `${hours}:${minutes}`;
@@ -147,6 +151,11 @@ export function DigitalClock({
             data-testid="text-hero-timezone"
           >
             {timezone}
+            {weather && (
+              <span className={`ml-2 ${getTemperatureColor(weather.celsius)}`} data-testid="text-hero-temperature">
+                {weather.fahrenheit}°F / {weather.celsius}°C
+              </span>
+            )}
           </p>
         </div>
         <ThemeToggle />
@@ -206,7 +215,14 @@ export function DigitalClock({
             </p>
           )}
 
-          <p className="text-xs text-muted-foreground">{timezone}</p>
+          <p className="text-xs text-muted-foreground">
+            {timezone}
+            {weather && (
+              <span className={`ml-2 ${getTemperatureColor(weather.celsius)}`} data-testid={`text-temp-${selectedZoneKey}`}>
+                {weather.fahrenheit}°F / {weather.celsius}°C
+              </span>
+            )}
+          </p>
 
           {selectedZoneKey && otherZoneKeys.length > 0 && (
             <div className="ml-auto">
@@ -285,7 +301,14 @@ export function DigitalClock({
             {timeString}
           </p>
         )}
-        <p className="mt-1 text-xs text-muted-foreground">{timezone}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {timezone}
+          {weather && (
+            <span className={`ml-2 ${getTemperatureColor(weather.celsius)}`} data-testid={`text-temp-${selectedZoneKey}`}>
+              {weather.fahrenheit}°F / {weather.celsius}°C
+            </span>
+          )}
+        </p>
       </div>
     </div>
   );

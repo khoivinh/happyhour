@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { CalendarClock } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ALL_TIMEZONES, type TimezoneKey } from "@shared/schema";
 
 interface MeetingPlannerModalProps {
@@ -90,7 +90,9 @@ export function MeetingPlannerModal({ hostZoneKey, otherZoneKeys }: MeetingPlann
           <DialogTitle className="font-display font-semibold text-foreground">
             Meeting Time Zone Calculations
           </DialogTitle>
-          <p className="text-sm text-muted-foreground">Plan meetings across different time zones</p>
+          <DialogDescription>
+            Plan meetings across different time zones
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">

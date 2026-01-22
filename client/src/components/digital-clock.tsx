@@ -250,7 +250,7 @@ export function DigitalClock({
       data-testid={`clock-tile-${selectedZoneKey}`}
     >
       {isDraggable && (
-        <div className="absolute top-[25px] left-2 text-muted-foreground/50 hover:text-muted-foreground transition-colors">
+        <div className="absolute top-4 left-2 text-muted-foreground/50 hover:text-muted-foreground transition-colors">
           <GripVertical className="h-4 w-4" />
         </div>
       )}

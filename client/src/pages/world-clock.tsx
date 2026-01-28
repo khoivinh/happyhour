@@ -1,17 +1,22 @@
 import { useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TimeZoneConverter } from "@/components/time-zone-converter";
-import { ALL_TIMEZONES, type TimezoneKey } from "@shared/schema";
+import { getCityByKey } from "@/lib/city-lookup";
 
 export default function WorldClock() {
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [selectedTime, setSelectedTime] = useState<Date | null>(null);
 
-  function handleTimeUpdate(zoneKey: TimezoneKey, hours: number, minutes: number) {
+  function handleTimeUpdate(zoneKey: string, hours: number, minutes: number) {
+    const city = getCityByKey(zoneKey);
+    if (!city) return;
+    
     const now = new Date();
-    const offset = ALL_TIMEZONES[zoneKey].offset;
+    // Create a date with the user's input hours/minutes
     const inputTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0);
-    const utcTime = new Date(inputTime.getTime() - offset * 3600000);
+    // Convert from the city's timezone to UTC
+    const utcTime = new Date(inputTime.getTime() - (city.offset * 3600000) - (inputTime.getTimezoneOffset() * 60000));
 
     setSelectedTime(utcTime);
     setIsCustomMode(true);
@@ -34,7 +39,8 @@ export default function WorldClock() {
           </h1>
 
           {isCustomMode && (
-            <Button onClick={handleReset} data-testid="button-show-live-time">
+            <Button onClick={handleReset} data-testid="button-show-live-time" className="gap-2">
+              <RotateCcw className="h-4 w-4" />
               Show Live Time
             </Button>
           )}

@@ -140,6 +140,9 @@ export function searchCities(query: string, limit = 50): TimezoneOption[] {
 }
 
 export function getTimeInCityZone(baseTime: Date, offset: number): Date {
-  const utcTime = baseTime.getTime() + baseTime.getTimezoneOffset() * 60000;
-  return new Date(utcTime + offset * 3600000);
+  // Convert baseTime to a Date that displays the target timezone's time
+  // when using getHours()/getMinutes() in the local environment
+  const utcMs = baseTime.getTime();
+  const targetMs = utcMs + (offset * 3600000) + (baseTime.getTimezoneOffset() * 60000);
+  return new Date(targetMs);
 }

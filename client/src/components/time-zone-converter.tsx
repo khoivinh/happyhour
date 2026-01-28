@@ -301,8 +301,8 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate }: 
     if (isCustomMode && selectedTime) {
       return selectedTime;
     }
-    const now = currentTime || new Date();
-    return new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+    // Return the current time directly - getTimeInCityZone handles timezone conversion
+    return currentTime || new Date();
   }
 
   function getOtherZoneKeys(currentIndex: number): string[] {

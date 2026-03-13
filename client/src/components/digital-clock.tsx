@@ -57,7 +57,7 @@ function CitySelector({
     >
       <PopoverTrigger asChild>
         <button
-          className="flex items-center gap-1 text-sm font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors focus:outline-none min-h-[44px] touch-manipulation"
+          className="flex items-start gap-1 text-sm font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors focus:outline-none min-h-[44px] touch-manipulation"
           data-testid="button-city-selector"
         >
           {selectedCity?.name || "Select city"}
@@ -335,7 +335,7 @@ export function DigitalClock({
         {/* Drag handle */}
         {isDraggable && (
           <div
-            className="flex-shrink-0 flex items-center justify-center h-8 w-8 -ml-1 mt-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing touch-none"
+            className="flex-shrink-0 flex items-center justify-center h-5 w-8 -ml-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing touch-none"
             {...(dragHandleListeners as React.HTMLAttributes<HTMLDivElement>)}
             title="Drag to reorder"
           >
@@ -415,7 +415,7 @@ export function DigitalClock({
       </div>
 
       {/* Desktop: time and timezone below the top row */}
-      <div className="hidden sm:block pl-7 -ml-4">
+      <div className="hidden sm:block pl-9">
         {isEditing ? (
           <div className="mt-1 space-y-3 pb-2">
             <Input

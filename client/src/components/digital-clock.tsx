@@ -200,7 +200,7 @@ export function DigitalClock({
   }
 
   function handleRemoveWithConfirm() {
-    if (onRemove && confirm("Remove this clock?")) {
+    if (onRemove && confirm(`Remove ${cityName}?`)) {
       onRemove();
     }
   }
@@ -209,65 +209,67 @@ export function DigitalClock({
 
   if (isHero) {
     return (
-      <div className="flex items-start justify-between px-[10px]">
-        <div className="flex-1 min-w-0">
-          <p
-            className="text-sm font-medium uppercase tracking-wide text-muted-foreground"
-            data-testid="text-hero-city"
-          >
-            {cityName}
-          </p>
-          {isEditing ? (
-            <div className="mt-1 flex items-center gap-4 flex-wrap">
-              <Input
-                type="time"
-                value={editTime}
-                onChange={(e) => setEditTime(e.target.value)}
-                className="font-display text-4xl font-black h-auto py-2 px-3 w-48"
-                autoFocus
-                data-testid="input-edit-time"
-              />
-              <Button onClick={handleUpdateClick} data-testid="button-update-clock">
-                Update Clock
-              </Button>
-              <Button variant="ghost" onClick={handleCancelEdit} data-testid="button-cancel-edit">
-                Cancel
-              </Button>
-            </div>
-          ) : (
+      <div className="px-[10px]">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
             <p
-              className="mt-1 font-display text-6xl font-black tracking-tight text-foreground md:text-8xl cursor-pointer hover:text-primary transition-colors"
-              onClick={handleTimeClick}
-              title="Click to edit time"
-              data-testid="text-hero-time"
+              className="text-sm font-medium uppercase tracking-wide text-muted-foreground"
+              data-testid="text-hero-city"
             >
-              {timeString}
+              {cityName}
             </p>
-          )}
-          <div
-            className="mt-2 flex items-center justify-between"
-            data-testid="text-hero-timezone"
-          >
-            <p className="text-sm text-muted-foreground">
-              {timezone}
-              {weather && (
-                <span className={`ml-2 ${getTemperatureColor(weather.celsius)}`} data-testid="text-hero-temperature">
-                  {weather.fahrenheit}°F / {weather.celsius}°C
-                </span>
-              )}
-            </p>
-            {isCustomMode && onReset && (
-              <button
-                onClick={onReset}
-                className="font-semibold text-sm uppercase text-[#4e82ee] px-2.5 py-[7px] cursor-pointer hover:opacity-80 transition-opacity"
-                data-testid="button-reset-time"
+            {isEditing ? (
+              <div className="mt-1 flex items-center gap-4 flex-wrap">
+                <Input
+                  type="time"
+                  value={editTime}
+                  onChange={(e) => setEditTime(e.target.value)}
+                  className="font-display text-4xl font-black h-auto py-2 px-3 w-48"
+                  autoFocus
+                  data-testid="input-edit-time"
+                />
+                <Button onClick={handleUpdateClick} data-testid="button-update-clock">
+                  Update Clock
+                </Button>
+                <Button variant="ghost" onClick={handleCancelEdit} data-testid="button-cancel-edit">
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <p
+                className="mt-1 font-display text-6xl font-black tracking-tight text-foreground md:text-8xl cursor-pointer hover:text-primary transition-colors"
+                onClick={handleTimeClick}
+                title="Click to edit time"
+                data-testid="text-hero-time"
               >
-                Reset Time
-              </button>
+                {timeString}
+              </p>
             )}
           </div>
+          <ThemeToggle />
         </div>
-        <ThemeToggle />
+        <div
+          className="mt-2 flex items-center justify-between"
+          data-testid="text-hero-timezone"
+        >
+          <p className="text-sm text-muted-foreground">
+            {timezone}
+            {weather && (
+              <span className={`ml-2 ${getTemperatureColor(weather.celsius)}`} data-testid="text-hero-temperature">
+                {weather.fahrenheit}°F / {weather.celsius}°C
+              </span>
+            )}
+          </p>
+          {isCustomMode && onReset && (
+            <button
+              onClick={onReset}
+              className="font-semibold text-sm uppercase text-[#4e82ee] px-2.5 py-[7px] cursor-pointer hover:opacity-80 transition-opacity"
+              data-testid="button-reset-time"
+            >
+              Reset Time
+            </button>
+          )}
+        </div>
       </div>
     );
   }

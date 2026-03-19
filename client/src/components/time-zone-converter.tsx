@@ -66,8 +66,6 @@ function SortableClockItem({
     transform,
     transition,
     isDragging,
-    active,
-    over,
   } = useSortable({ id });
 
   const style = {
@@ -78,13 +76,6 @@ function SortableClockItem({
 
   const city = getCityByKey(zoneKey);
 
-  const overIndex = over ? allZones.indexOf(over.id as string) : -1;
-  const currentIndex = allZones.indexOf(id);
-  const isBeingHoveredOver = over?.id === id && active?.id !== id;
-
-  // Always show indicator on the LEFT of the destination
-  const showLeftIndicator = isBeingHoveredOver;
-
   return (
     <div
       ref={setNodeRef}
@@ -93,10 +84,6 @@ function SortableClockItem({
       className="relative"
       data-testid={`draggable-zone-${zoneKey}`}
     >
-      {showLeftIndicator && (
-        <div className="absolute -left-[5px] top-0 bottom-0 w-1 bg-[#3c83f6] rounded-[4px]" />
-      )}
-
       <DigitalClock
         time={city ? getTimeInCityZone(baseTime, city.offset) : baseTime}
         cityName={city?.name || zoneKey}
@@ -263,13 +250,8 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   }, [addZoneOpen]);
 
   const allFilteredCities = searchCities(addZoneSearchQuery, 100);
-  const alreadyDisplayedCities = allFilteredCities.filter((city) => selectedZones.includes(city.key));
-  const filteredCitiesToAdd = allFilteredCities.filter((city) => !selectedZones.includes(city.key));
 
   const canAddMoreZones = selectedZones.length < MAX_CLOCKS;
-
-  // Determine the empty state message
-  const showAlreadyDisplayed = filteredCitiesToAdd.length === 0 && alreadyDisplayedCities.length > 0;
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as string);
@@ -394,29 +376,40 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
                   data-testid="input-add-zone-search"
                 />
                 <CommandList>
-                  <CommandEmpty>
-                    {showAlreadyDisplayed ? "Already displayed." : "No cities found."}
-                  </CommandEmpty>
+                  <CommandEmpty>No cities found.</CommandEmpty>
                   <CommandGroup>
-                    {filteredCitiesToAdd.map((city) => (
-                      <CommandItem
-                        key={city.key}
-                        value={city.key}
-                        onSelect={() => {
-                          handleAddClock(city.key);
-                          setAddZoneOpen(false);
-                          setAddZoneSearchQuery("");
-                        }}
-                        data-testid={`menu-item-${city.key}`}
-                      >
-                        <div className="flex flex-col">
-                          <span>{city.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {city.country} ({city.gmtLabel})
-                          </span>
-                        </div>
-                      </CommandItem>
-                    ))}
+                    {allFilteredCities.map((city) => {
+                      const isDisplayed = selectedZones.includes(city.key);
+                      return (
+                        <CommandItem
+                          key={city.key}
+                          value={city.key}
+                          disabled={isDisplayed}
+                          onSelect={() => {
+                            if (isDisplayed) return;
+                            handleAddClock(city.key);
+                            setAddZoneOpen(false);
+                            setAddZoneSearchQuery("");
+                          }}
+                          className={isDisplayed ? "opacity-60" : ""}
+                          data-testid={`menu-item-${city.key}`}
+                        >
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-[6px]">
+                              <span>{city.name}</span>
+                              {isDisplayed && (
+                                <span className="inline-flex items-center justify-center px-[5px] border border-[#6b7280] rounded-[3px] text-[7px] font-bold uppercase text-[#6b7280] leading-[15px]">
+                                  Currently Displayed
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {city.country} ({city.gmtLabel})
+                            </span>
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
                   </CommandGroup>
                 </CommandList>
               </Command>

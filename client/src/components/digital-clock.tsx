@@ -350,12 +350,12 @@ export function DigitalClock({
         {/* Time (right side on mobile) */}
         {isEditing ? (
           <div className="flex items-start shrink-0 sm:hidden">
-            <div className="flex items-start gap-[10px] border border-[#c4c7cc] rounded-[8px] pl-[16px] pr-[10px] pt-[9px] pb-[10px]">
+            <div className="flex items-start gap-[10px] border border-[#c4c7cc] rounded-[8px] pl-[16px] pr-[10px] pt-[9px] pb-[10px] bg-transparent">
               <Input
                 type="time"
                 value={editTime}
                 onChange={(e) => setEditTime(e.target.value)}
-                className="font-display text-2xl font-black h-auto p-0 border-0 shadow-none focus-visible:ring-0 w-[72px] leading-[33px] tracking-[-0.6px]"
+                className="font-display text-2xl font-black h-auto p-0 border-0 shadow-none focus-visible:ring-0 w-[72px] leading-[33px] tracking-[-0.6px] bg-transparent [&::-webkit-calendar-picker-indicator]:hidden"
                 autoFocus
               />
               <button
@@ -398,12 +398,12 @@ export function DigitalClock({
       <div className="hidden sm:block pl-7">
         {isEditing ? (
           <div className="mt-1">
-            <div className="flex items-start gap-[15px] border border-[#c4c7cc] rounded-[8px] pl-[16px] pr-[12px] pt-[11px] pb-[12px] w-full">
+            <div className="flex items-start gap-[15px] border border-[#c4c7cc] rounded-[8px] pl-[16px] pr-[12px] pt-[11px] pb-[12px] w-full bg-transparent">
               <Input
                 type="time"
                 value={editTime}
                 onChange={(e) => setEditTime(e.target.value)}
-                className="font-display text-[36px] font-black h-auto p-0 border-0 shadow-none focus-visible:ring-0 flex-1 leading-[36px] tracking-[-0.6px]"
+                className="font-display text-[36px] font-black h-auto p-0 border-0 shadow-none focus-visible:ring-0 flex-1 leading-[36px] tracking-[-0.6px] bg-transparent [&::-webkit-calendar-picker-indicator]:hidden"
                 autoFocus
               />
               <button

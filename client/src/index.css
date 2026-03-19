@@ -121,6 +121,11 @@
   }
 }
 
+/* Force left-align time inputs on mobile Safari */
+input[type="time"].time-left-align::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 /* Remove blue highlight that appears when dragging clock tiles */
 [data-testid^="draggable-zone-"] {
   -webkit-tap-highlight-color: transparent;

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { GripVertical, Check, ChevronsUpDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
+
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -219,32 +219,55 @@ export function DigitalClock({
 
   if (isHero) {
     return (
-      <div className="px-[10px]">
+      <div className={`px-[10px] flex flex-col ${isEditing ? "gap-[5px] sm:gap-[10px]" : "gap-[2px] sm:gap-0"}`}>
         <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
+          <div className={`flex-1 min-w-0 flex flex-col ${isEditing ? "gap-[5px] sm:gap-[7px]" : "gap-[2px] sm:gap-0"}`}>
             <p
-              className="text-sm font-medium uppercase tracking-wide text-muted-foreground"
+              className="h-[20px] text-[14px] leading-[20px] font-medium uppercase tracking-[0.35px] text-muted-foreground"
               data-testid="text-hero-city"
             >
               {cityName}
             </p>
             {isEditing ? (
-              <div className="mt-1 flex items-center gap-4" ref={editContainerRef}>
-                <input
-                  type="time"
-                  value={editTime}
-                  onChange={(e) => setEditTime(e.target.value)}
-                  className="font-display text-4xl font-black h-auto py-2 bg-transparent border-none outline-none appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
-                  autoFocus
-                  data-testid="input-edit-time"
-                />
-                <Button onClick={handleUpdateClick} data-testid="button-update-clock">
-                  Update Clock
-                </Button>
+              <div ref={editContainerRef}>
+                {/* Desktop edit */}
+                <div className="hidden sm:flex w-full items-center gap-[10px] border border-[#c4c7cc] rounded-[12px] pl-[20px] pr-[25px] py-[10px]">
+                  <input
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    className="font-display text-[48px] font-black leading-normal bg-transparent border-none outline-none appearance-none p-0 flex-1 min-w-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
+                    autoFocus
+                    data-testid="input-edit-time"
+                  />
+                  <button
+                    onClick={handleUpdateClick}
+                    className="bg-[#4e82ee] rounded-[6px] px-[12px] pt-[6px] pb-[7px] text-white font-semibold text-sm leading-[21px] tracking-[-0.1px] shrink-0"
+                    data-testid="button-update-clock"
+                  >
+                    OK
+                  </button>
+                </div>
+                {/* Mobile edit */}
+                <div className="flex sm:hidden w-full items-center gap-[10px] border border-[#c4c7cc] rounded-[10px] pl-[13px] pr-[11px] py-[10px]">
+                  <input
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    className="font-display text-[28px] font-black leading-normal bg-transparent border-none outline-none appearance-none p-0 flex-1 min-w-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleUpdateClick}
+                    className="bg-[#4e82ee] rounded-[6px] px-[12px] pt-[6px] pb-[7px] text-white font-semibold text-sm leading-[21px] tracking-[-0.1px] shrink-0"
+                  >
+                    OK
+                  </button>
+                </div>
               </div>
             ) : (
               <p
-                className="mt-1 font-display text-[60px] font-black tracking-tight text-foreground leading-[60px] md:text-8xl md:leading-[96px] cursor-pointer hover:text-primary transition-colors min-h-[60px] md:min-h-[96px]"
+                className="font-display text-[60px] font-black tracking-[-2.4px] text-foreground leading-[60px] md:text-[96px] md:leading-[96px] cursor-pointer hover:text-primary transition-colors whitespace-nowrap"
                 onClick={handleTimeClick}
                 title="Click to edit time"
                 data-testid="text-hero-time"
@@ -256,7 +279,7 @@ export function DigitalClock({
           <ThemeToggle />
         </div>
         <div
-          className="mt-2 flex items-center justify-between h-[28px]"
+          className={`flex items-center justify-between ${!isCustomMode && !isEditing ? "h-[28px]" : ""}`}
           data-testid="text-hero-timezone"
         >
           <p className="text-sm text-muted-foreground">

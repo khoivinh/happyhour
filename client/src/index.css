@@ -122,6 +122,38 @@
 }
 
 
+/* Sidebar open: fade in small box, then expand */
+@keyframes sidebar-open {
+  0% {
+    opacity: 0;
+    clip-path: inset(8px 10px calc(100% - 48px) calc(100% - 56px) round 12px);
+  }
+  25% {
+    opacity: 1;
+    clip-path: inset(8px 10px calc(100% - 48px) calc(100% - 56px) round 12px);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 15px);
+  }
+}
+
+/* Sidebar close: shrink then fade out */
+@keyframes sidebar-close {
+  0% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 15px);
+  }
+  75% {
+    opacity: 1;
+    clip-path: inset(8px 10px calc(100% - 48px) calc(100% - 56px) round 12px);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(8px 10px calc(100% - 48px) calc(100% - 56px) round 12px);
+  }
+}
+
 /* Remove blue highlight that appears when dragging clock tiles */
 [data-testid^="draggable-zone-"] {
   -webkit-tap-highlight-color: transparent;

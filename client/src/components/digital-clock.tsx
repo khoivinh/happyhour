@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { GripVertical, Check, ChevronsUpDown } from "lucide-react";
 
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -47,6 +46,7 @@ interface DigitalClockProps {
   heroDate?: Date;
   isCustomMode?: boolean;
   onReset?: () => void;
+  use24Hour?: boolean;
 }
 
 function CitySelector({
@@ -165,13 +165,26 @@ export function DigitalClock({
   heroDate,
   isCustomMode = false,
   onReset,
+  use24Hour = true,
 }: DigitalClockProps) {
-  const hours = time.getHours().toString().padStart(2, "0");
+  const rawHours = time.getHours();
   const minutes = time.getMinutes().toString().padStart(2, "0");
   const seconds = time.getSeconds().toString().padStart(2, "0");
 
-  const timeString = showSeconds ? `${hours}:${minutes}:${seconds}` : `${hours}:${minutes}`;
-  const amPm = time.getHours() >= 12 ? "PM" : "AM";
+  const amPm = rawHours >= 12 ? "PM" : "AM";
+
+  let displayHours: string;
+  let timeString: string;
+  if (use24Hour) {
+    displayHours = rawHours.toString().padStart(2, "0");
+    timeString = showSeconds ? `${displayHours}:${minutes}:${seconds}` : `${displayHours}:${minutes}`;
+  } else {
+    const h12 = rawHours % 12 || 12;
+    displayHours = h12.toString();
+    timeString = showSeconds
+      ? `${displayHours}:${minutes}:${seconds} ${amPm}`
+      : `${displayHours}:${minutes} ${amPm}`;
+  }
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -183,7 +196,7 @@ export function DigitalClock({
 
   function handleTimeClick() {
     if (onTimeUpdate && zoneKey) {
-      setEditTime(`${hours}:${minutes}`);
+      setEditTime(`${rawHours.toString().padStart(2, "0")}:${minutes}`);
       setIsEditing(true);
     }
   }
@@ -219,9 +232,9 @@ export function DigitalClock({
 
   if (isHero) {
     return (
-      <div className={`px-[10px] flex flex-col ${isEditing ? "gap-[5px] sm:gap-[10px]" : "gap-[2px] sm:gap-0"}`}>
-        <div className="flex items-start justify-between">
-          <div className={`flex-1 min-w-0 flex flex-col ${isEditing ? "gap-[5px] sm:gap-[7px]" : "gap-[2px] sm:gap-0"}`}>
+      <div className="px-[10px] flex flex-col gap-[2px] sm:gap-0 sm:min-h-[144px]">
+        <div>
+          <div className="flex-1 min-w-0 flex flex-col gap-[2px] sm:gap-0">
             <p
               className="h-[20px] text-[14px] leading-[20px] font-medium uppercase tracking-[0.35px] text-muted-foreground"
               data-testid="text-hero-city"
@@ -229,7 +242,7 @@ export function DigitalClock({
               {cityName}
             </p>
             {isEditing ? (
-              <div ref={editContainerRef}>
+              <div ref={editContainerRef} className="relative">
                 {/* Desktop edit */}
                 <div className="hidden sm:flex w-full items-center gap-[10px] border border-[#c4c7cc] rounded-[12px] pl-[20px] pr-[25px] py-[10px]">
                   <input
@@ -254,7 +267,7 @@ export function DigitalClock({
                     type="time"
                     value={editTime}
                     onChange={(e) => setEditTime(e.target.value)}
-                    className="font-display text-[28px] font-black leading-normal bg-transparent border-none outline-none appearance-none p-0 w-[5ch] min-w-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
+                    className="font-display text-[28px] font-black leading-normal bg-transparent border-none outline-none appearance-none p-0 min-w-0 w-[170px] [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                     autoFocus
                   />
                   <button
@@ -276,15 +289,14 @@ export function DigitalClock({
               </p>
             )}
           </div>
-          <ThemeToggle />
         </div>
         <div
-          className={`flex items-center justify-between ${!isCustomMode && !isEditing ? "h-[28px]" : ""}`}
+          className="flex items-center justify-between h-[28px]"
           data-testid="text-hero-timezone"
         >
           <p className="text-sm text-muted-foreground">
             {timezone}
-            {weather && (
+            {!isCustomMode && weather && (
               <span className={`ml-2 ${getTemperatureColor(weather.celsius)}`} data-testid="text-hero-temperature">
                 {weather.fahrenheit}°F / {weather.celsius}°C
               </span>
@@ -293,7 +305,7 @@ export function DigitalClock({
           {isCustomMode && onReset && (
             <button
               onClick={onReset}
-              className="font-semibold text-sm uppercase text-[#4e82ee] px-2.5 py-[7px] cursor-pointer hover:opacity-80 transition-opacity"
+              className="font-semibold text-sm uppercase text-[#4e82ee] px-2.5 py-[3px] cursor-pointer hover:opacity-80 transition-opacity"
               data-testid="button-reset-time"
             >
               Reset Time
@@ -353,15 +365,15 @@ export function DigitalClock({
           )}
           {/* Mobile: zone + temp inline below city name (hidden when editing) */}
           {!isEditing && (
-            <p className={`text-xs text-muted-foreground sm:hidden flex items-center ${dayIndicator ? "gap-[6px]" : "gap-[10px]"}`}>
+            <p className={`text-xs text-muted-foreground sm:hidden flex items-center flex-nowrap overflow-hidden ${dayIndicator ? "gap-[6px]" : "gap-[10px]"}`}>
               <span>{timezone}</span>
               {dayIndicator && (
-                <span className="inline-flex items-center justify-center px-[5px] border border-[#6b7280] rounded-[3px] text-[7px] font-bold uppercase text-[#6b7280] leading-[15px]">
+                <span className="inline-flex items-center justify-center px-[5px] border border-[#6b7280] rounded-[3px] text-[7px] font-bold uppercase text-[#6b7280] leading-[15px] whitespace-nowrap shrink-0">
                   {dayIndicator === "next" ? "Next Day" : "Prev Day"}
                 </span>
               )}
-              {weather && (
-                <span className={getTemperatureColor(weather.celsius)}>
+              {!isCustomMode && weather && (
+                <span className={`${getTemperatureColor(weather.celsius)} truncate`}>
                   {weather.fahrenheit}°F / {weather.celsius}°C
                 </span>
               )}
@@ -405,7 +417,7 @@ export function DigitalClock({
                     {dayIndicator === "next" ? "Next Day" : "Prev Day"}
                   </span>
                 )}
-                {weather && (
+                {!isCustomMode && weather && (
                   <span className={getTemperatureColor(weather.celsius)} data-testid={`text-temp-${selectedZoneKey}`}>
                     {weather.fahrenheit}°F / {weather.celsius}°C
                   </span>

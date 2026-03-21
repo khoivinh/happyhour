@@ -30,6 +30,9 @@ interface TimeZoneConverterProps {
   selectedTime: Date | null;
   onTimeUpdate: (zoneKey: string, hours: number, minutes: number) => void;
   onReset: () => void;
+  use24Hour: boolean;
+  sortEastToWest: boolean;
+  onSortEastToWestChange: (value: boolean) => void;
 }
 
 interface SortableClockItemProps {
@@ -45,6 +48,8 @@ interface SortableClockItemProps {
   onRemove: (zoneKey: string) => void;
   allZones: string[];
   isDragActive: boolean;
+  isCustomMode: boolean;
+  use24Hour: boolean;
 }
 
 function SortableClockItem({
@@ -60,6 +65,8 @@ function SortableClockItem({
   onRemove,
   allZones,
   isDragActive,
+  isCustomMode,
+  use24Hour,
 }: SortableClockItemProps) {
   const {
     attributes,
@@ -103,6 +110,8 @@ function SortableClockItem({
         isDragActive={isDragActive}
         dragHandleListeners={listeners}
         heroDate={heroDate}
+        isCustomMode={isCustomMode}
+        use24Hour={use24Hour}
       />
     </div>
   );
@@ -151,7 +160,7 @@ function migrateOldKeys(keys: string[]): string[] {
 
 const DEFAULT_ZONES = ["paris_FR", "newYork_US", "losAngeles_US"];
 
-export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset }: TimeZoneConverterProps) {
+export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange }: TimeZoneConverterProps) {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [selectedZones, setSelectedZones] = useState<string[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -170,6 +179,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   const [newlyAddedZone, setNewlyAddedZone] = useState<string | null>(null);
   const [highlightedZone, setHighlightedZone] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const preSortOrderRef = useRef<string[] | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -196,6 +206,33 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedZones));
   }, [selectedZones]);
+
+  // Sort zones east-to-west when toggled on; restore original order when toggled off
+  useEffect(() => {
+    if (sortEastToWest) {
+      // Snapshot current manual order before sorting
+      setSelectedZones((prev) => {
+        preSortOrderRef.current = [...prev];
+        const sorted = [...prev].sort((a, b) => {
+          const cityA = getCityByKey(a);
+          const cityB = getCityByKey(b);
+          return (cityB?.offset ?? 0) - (cityA?.offset ?? 0);
+        });
+        if (sorted.every((z, i) => z === prev[i])) return prev;
+        return sorted;
+      });
+    } else if (preSortOrderRef.current) {
+      // Restore pre-sort order, accounting for zones added/removed since
+      const snapshot = preSortOrderRef.current;
+      setSelectedZones((current) => {
+        const currentSet = new Set(current);
+        const restored = snapshot.filter((z) => currentSet.has(z));
+        const added = current.filter((z) => !snapshot.includes(z));
+        return [...restored, ...added];
+      });
+      preSortOrderRef.current = null;
+    }
+  }, [sortEastToWest]);
 
   useEffect(() => {
     if (isCustomMode) return;
@@ -272,6 +309,11 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     document.body.style.touchAction = "";
 
     if (over && active.id !== over.id) {
+      // Manual reorder invalidates the sort — clear snapshot and disable toggle
+      if (sortEastToWest) {
+        preSortOrderRef.current = null;
+        onSortEastToWestChange(false);
+      }
       setSelectedZones((items) => {
         const oldIndex = items.indexOf(active.id as string);
         const newIndex = items.indexOf(over.id as string);
@@ -350,6 +392,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
           onTimeUpdate={onTimeUpdate}
           isCustomMode={isCustomMode}
           onReset={onReset}
+          use24Hour={use24Hour}
         />
       </section>
 
@@ -452,6 +495,8 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
                   onRemove={handleRemoveClock}
                   allZones={selectedZones}
                   isDragActive={activeId !== null}
+                  isCustomMode={isCustomMode}
+                  use24Hour={use24Hour}
                 />
               ))}
             </div>

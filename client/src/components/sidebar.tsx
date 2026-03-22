@@ -146,8 +146,8 @@ export function Sidebar({
             : "pointer-events-none"
         }`}
         style={{
-          top: `${topOffset}px`,
-          height: `calc(100vh - ${topOffset + 28}px)`,
+          top: `${topOffset - 18}px`,
+          height: `calc(100vh - ${topOffset - 18 + 28}px)`,
           animation: open
             ? "sidebar-open 350ms cubic-bezier(0.32, 0.72, 0, 1) forwards"
             : hasBeenOpened.current

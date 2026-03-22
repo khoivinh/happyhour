@@ -33,9 +33,8 @@ export default function WorldClock() {
     function updateHeader() {
       const ratio = Math.min(1, Math.max(0, window.scrollY / SCROLL_RANGE));
       if (headerRef.current) {
-        const py = PY_START + (PY_END - PY_START) * ratio;
-        headerRef.current.style.paddingTop = `${py}px`;
-        headerRef.current.style.paddingBottom = `${py}px`;
+        const pyBottom = PY_START + (PY_END - PY_START) * ratio;
+        headerRef.current.style.paddingBottom = `${pyBottom}px`;
       }
       if (h1Ref.current) {
         const fs = FS_START + (FS_END - FS_START) * ratio;

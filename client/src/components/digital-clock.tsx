@@ -340,7 +340,7 @@ export function DigitalClock({
         {/* Drag handle */}
         {isDraggable && (
           <div
-            className="flex-shrink-0 flex items-start justify-center pt-2.5 pr-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing touch-none"
+            className="flex-shrink-0 flex items-start justify-center pt-2.5 pr-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing"
             {...(dragHandleListeners as React.HTMLAttributes<HTMLDivElement>)}
             data-drag-handle
             title="Drag to reorder"

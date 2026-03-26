@@ -18,25 +18,38 @@ interface UseCloudSyncOptions {
 }
 
 const DEBOUNCE_MS = 1500;
+const SYNC_SNAPSHOT_KEY = "world-khlock-sync-snapshot";
+const SYNC_TIMESTAMP_KEY = "world-khlock-sync-at";
 
-function mergePreferences(local: SyncablePreferences, cloud: Omit<CloudPreferences, "updatedAt">): SyncablePreferences {
-  // Union zones: cloud order first, then local-only zones appended, deduped, capped at 16
-  const seen = new Set<string>();
-  const merged: string[] = [];
-  for (const z of [...cloud.zones, ...local.zones]) {
-    if (!seen.has(z)) {
-      seen.add(z);
-      merged.push(z);
-    }
-  }
-
+function cloudToLocal(cloud: Omit<CloudPreferences, "updatedAt">): SyncablePreferences {
   return {
-    zones: merged.slice(0, 16),
+    zones: cloud.zones.slice(0, 16),
     use24h: cloud.use24h,
     sortEastToWest: cloud.sortEastToWest,
     showRelativeTime: cloud.showRelativeTime ?? false,
     theme: cloud.theme,
   };
+}
+
+function prefsFingerprint(p: SyncablePreferences): string {
+  return `${p.zones.join(",")}|${p.use24h}|${p.sortEastToWest}|${p.showRelativeTime}|${p.theme}`;
+}
+
+function saveSyncState(prefs: SyncablePreferences, updatedAt: string) {
+  try {
+    localStorage.setItem(SYNC_SNAPSHOT_KEY, prefsFingerprint(prefs));
+    localStorage.setItem(SYNC_TIMESTAMP_KEY, updatedAt);
+  } catch { /* localStorage full — non-critical */ }
+}
+
+function hasLocalChanges(current: SyncablePreferences): boolean {
+  const snapshot = localStorage.getItem(SYNC_SNAPSHOT_KEY);
+  if (!snapshot) return true; // No snapshot = first sync, treat as local changes
+  return prefsFingerprint(current) !== snapshot;
+}
+
+function getLastSyncTimestamp(): string | null {
+  return localStorage.getItem(SYNC_TIMESTAMP_KEY);
 }
 
 // Hook that uses Clerk auth — must be called inside ClerkProvider
@@ -75,21 +88,36 @@ function useCloudSyncWithAuth({ preferences, setPreferences }: UseCloudSyncOptio
         if (cancelled) return;
 
         if (!cloud) {
-          await savePreferences(token, prefsRef.current);
+          // First sync — push local prefs to cloud
+          const saved = await savePreferences(token, prefsRef.current);
+          saveSyncState(prefsRef.current, saved.updatedAt);
         } else {
-          const merged = mergePreferences(prefsRef.current, cloud);
+          const localChanged = hasLocalChanges(prefsRef.current);
+
+          let winner: SyncablePreferences;
+          if (!localChanged) {
+            // No local edits since last sync — cloud wins (common case)
+            winner = cloudToLocal(cloud);
+          } else {
+            // Local edits detected (offline changes) — compare timestamps
+            const lastSync = getLastSyncTimestamp();
+            if (lastSync && lastSync < cloud.updatedAt) {
+              // Cloud is newer than our last sync — cloud wins
+              winner = cloudToLocal(cloud);
+            } else {
+              // Local is newer — push to cloud
+              winner = prefsRef.current;
+            }
+          }
+
           // Only update state if values actually changed — avoids creating
           // a new array reference that would interrupt dnd-kit drag sensors
           const current = prefsRef.current;
-          const zonesChanged = merged.zones.join(",") !== current.zones.join(",");
-          const settingsChanged = merged.use24h !== current.use24h
-            || merged.sortEastToWest !== current.sortEastToWest
-            || merged.showRelativeTime !== current.showRelativeTime
-            || merged.theme !== current.theme;
-          if (zonesChanged || settingsChanged) {
-            setPreferences(merged);
+          if (prefsFingerprint(winner) !== prefsFingerprint(current)) {
+            setPreferences(winner);
           }
-          await savePreferences(token, merged);
+          const saved = await savePreferences(token, winner);
+          saveSyncState(winner, saved.updatedAt);
         }
 
         if (!cancelled) setSyncStatus("synced");
@@ -122,7 +150,8 @@ function useCloudSyncWithAuth({ preferences, setPreferences }: UseCloudSyncOptio
       try {
         const token = await getToken();
         if (!token) return;
-        await savePreferences(token, prefsRef.current);
+        const saved = await savePreferences(token, prefsRef.current);
+        saveSyncState(prefsRef.current, saved.updatedAt);
         setSyncStatus("synced");
       } catch {
         setSyncStatus("error");

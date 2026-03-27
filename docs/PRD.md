@@ -1,13 +1,13 @@
-# World Khlock — Product Requirements Document
+# Khlock — Product Requirements Document
 
 ## Context
 
-World Khlock is a world clock and timezone converter web app (React/TypeScript/Tailwind, deployed on Cloudflare Pages). Phases 1-2 (codebase cleanup, deployment, mobile UX fixes) are complete. The scroll-driven header animation is confirmed smooth. This PRD covers two tracks:
+Khlock is a world clock and timezone converter web app (React/TypeScript/Tailwind, deployed on Cloudflare Pages). Phases 1-2 (codebase cleanup, deployment, mobile UX fixes) are complete. The scroll-driven header animation is confirmed smooth. This PRD covers two tracks:
 
 1. **Phase 3: UI Revisions + Cloud Sync** — revise clock tile interactions, hero clock, city menu, drag-and-drop, and add user accounts with cloud-synced preferences
 2. **iOS Native App** — SwiftUI app with feature parity + home/lock screen widgets + cloud sync
 
-**Status (2026-03-24):** Most Track 1 UI revisions are complete. The sidebar menu, long-press drag, and clock tile editing UI were added beyond the original scope. Cloud sync and the iOS app remain unstarted.
+**Status (2026-03-26):** Most Track 1 UI revisions are complete. Cloud sync (Clerk auth + Cloudflare Worker + D1) shipped 2026-03-25 using the Clerk dev instance (production instance requires a custom domain — see Backlog). Relative time offset feature and AM/PM sizing shipped 2026-03-26. Cross-device sync bug fixed 2026-03-26 — replaced union merge with cloud-wins strategy plus timestamp guard to prevent deleted zones from resurrecting on other devices. App rename voting form created via Google Forms. Several bug fixes and polish items remain before Track 1 is complete.
 
 ---
 
@@ -77,6 +77,8 @@ Revise the current UI — refine clock tile interactions, simplify the layout to
 - [x] Ghost tile (source position while dragging): 50% opacity
 - [x] Drag overlay (tile following cursor): 90% opacity, yellow active background (`#fdf19d`), border 1px solid `#ffedbd`, shadow `0px 1px 2px rgba(0,0,0,0.15)`
 - [x] Long-press to initiate drag on tile body (600ms delay, 5px movement tolerance); drag handle icon uses faster 150ms delay
+- [ ] **Bug:** Touch drag unreliable on left-most column — pressing/holding sometimes doesn't trigger drag, or requires unnaturally long hold
+- [ ] **Bug:** Drag overlay vertical spacing differs from resting tile — dragged tile should maintain identical sizing across all states
 
 ### Scope: Ellipsis Menu Replaces X Button
 **Files:** `client/src/components/digital-clock.tsx`
@@ -99,6 +101,7 @@ Revise the current UI — refine clock tile interactions, simplify the layout to
 - [x] Clock tile editing: single `type="time"` input with bordered edit UI matching Figma specs
 - [x] Duplicate city guard: changing a tile's city to one already displayed swaps positions instead of creating duplicates
 - [x] Max clocks: 16 (web)
+- [ ] **Bug:** "New Delhi" city name wrapping again — let city name span full tile width (flow under time display) before truncating; maintain left alignment of city name, timezone, and temp rows (must not shift under drag handle icon)
 
 ### Scope: Sidebar Menu *(added post-PRD, implemented 2026-03-21)*
 **Files:** `client/src/components/sidebar.tsx`, `client/src/pages/world-clock.tsx`
@@ -112,28 +115,38 @@ Revise the current UI — refine clock tile interactions, simplify the layout to
 - [x] Drawer icon position stays consistent between open/closed states
 - [x] Body scroll locked when sidebar is open
 - [x] Account/login UI designed but intentionally non-functional (deferred to cloud sync phase)
+- [ ] **Bug:** Login button text vertical alignment — text is 1-2px too close to the top
+- [ ] Reduce sidebar height on mobile by ~20% — currently extends below fold when browser address bar is fully shown
 
-### Scope: Cloud Sync & User Accounts (Planning Phase)
-**Auth:** Clerk (Google + Apple social login, passkeys)
+### Scope: Cloud Sync & User Accounts *(shipped 2026-03-25)*
+**Auth:** Clerk (Google + Apple social login via dev instance)
 **Backend:** Cloudflare Workers + D1
 
-This section is for **planning only** — implementation deferred to a later phase. The sidebar now exists with placeholder account UI ("Login or Sign Up" button), partially resolving some design decisions.
+- [x] Clerk modal login flow (Google + Apple)
+- [x] Cloudflare Worker API: `GET/PUT /api/preferences`, `DELETE /api/account`
+- [x] D1 schema: `user_preferences` table (user_id, zones, use_24h, sort_etw, theme, updated_at)
+- [x] `useCloudSync` hook: fetch on sign-in, debounce-save on change
+- [x] Cross-device sync: cloud-wins strategy with timestamp guard (replaced union merge that resurrected deleted zones)
+- [x] Sidebar: user avatar + name when signed in, sign out button, sync status indicator
+- [x] Graceful fallback: unauthenticated users use localStorage only
 
-- [x] Design decisions partially resolved:
-  - Header UI: drawer icon opens sidebar; sidebar contains "Login or Sign Up" button (logged out)
-  - Sidebar behavior: slide-out drawer from right — decided and implemented
-  - Login flow: still TBD (Clerk modal vs. redirect)
-  - Mobile behavior: sidebar spans full width on mobile — decided and implemented
-- [ ] Planned implementation (not yet):
-  - Integrate Clerk for authentication (sign in / sign up / sign out)
-  - Create Cloudflare Worker API endpoints (`GET/PUT /api/preferences`)
-  - Create D1 schema: `user_preferences` table (user_id, zones JSON, updated_at)
-  - Sync logic: on sign-in merge localStorage with cloud; on change debounce-save
-  - Graceful fallback: unauthenticated users continue using localStorage only
+### Scope: User Name Display Redesign
+**Files:** `client/src/components/sidebar.tsx`
+**Figma:** [Sidebar user display (node 114:1557)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Khlock-Design?node-id=114-1557)
+
+- [ ] Update signed-in user display in sidebar to match Figma component
+
+### Scope: Relative Time Offset
+**Files:** `client/src/components/digital-clock.tsx`, `client/src/components/sidebar.tsx`, `client/src/pages/world-clock.tsx`
+**Figma:** [Tile with relative time (node 158:1840)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Khlock-Design?node-id=158-1840)
+
+- [x] Add "Show Relative Time" toggle in sidebar (default OFF), synced to cloud
+- [x] When enabled, display offset relative to hero zone in format "+1HR" or "-7HR" in the zone/temp row
+- [x] Offset rendered inside a bordered badge; when combined with NEXT/PREV DAY, merged into a single unified badge with vertical divider (e.g. `+13HR | NEXT DAY`) — fixes wrapping bug on mobile
+- [x] AM/PM meridiem indicators rendered at reduced font size for readability (hero: 36/48px, tiles: 16/24px)
 
 ### Out of Scope (Phase 3)
 - Theme/color palette changes (current palette is close to final)
-- Clerk implementation (sidebar UI exists, but auth is deferred)
 
 ---
 
@@ -257,16 +270,143 @@ Khlock/
 
 ## Recommended Next Steps
 
-### Track 1 remaining items:
-1. Fix Add Cities menu to overlay content instead of pushing it down
-2. Implement Clerk authentication + cloud sync
+### Batch A — Quick fixes
+1. Login button text vertical alignment (1-2px CSS tweak)
+2. New Delhi city name wrapping (span full tile width, maintain left alignment)
+3. Sidebar mobile height (reduce ~20%)
+
+### Batch B — Drag fixes
+4. Drag overlay vertical spacing mismatch (match resting tile sizing)
+5. Touch drag unreliable on left column (sensor tuning)
+
+### Batch C — UI enhancements
+6. Add Cities menu overlay (float over tiles, not push down)
+7. User name display redesign (Figma node 114:1557)
 
 ### Then:
-3. Begin Track 2 (iOS native app), using the finalized web app as the reference design
+8. Begin Track 2 (iOS native app), using the finalized web app as the reference design
+
+---
+
+## App Rename
+
+### Status
+Evaluating name candidates. Voting form sent to friends and family (2026-03-26). No final decision yet.
+
+### Candidates (voting shortlist)
+
+| # | Name | Notes |
+|---|------|-------|
+| 1 | **Goldenhour** | Evocative, warm. |
+| 2 | **Tymely** | Readable misspelling, very ownable. |
+| 3 | **Khlock** | Current name. Personal, punny. |
+| 4 | **Hi Time** | Friendlier, greeting-like. Two words. |
+
+**Voting form:** [Google Form](https://docs.google.com/forms/d/e/1FAIpQLSeFXrJK7ZmhkvJWb3JVxmoJP2Y5ZYrOqgwrDzH5VlxiLcvmFQ/viewform) — rate each name 1-5, suggest alternatives, provide app feedback. Voters directed to try the app at https://khlock.pages.dev first.
+
+### Eliminated candidates
+- Goldnhour, Timly, Hightime — removed from shortlist 2026-03-26
+
+### Changes Required Once Name Is Decided
+
+- [ ] Register domain (e.g., `<name>.app` or `<name>.com`)
+- [ ] Rename GitHub repository
+- [ ] Update `package.json` name field
+- [ ] Update heading text in `client/src/components/` (header renders "Khlock")
+- [ ] Update Clerk app name
+- [ ] Update Cloudflare Pages project name and custom domain
+- [ ] Update Worker CORS allowed origins
+- [ ] Update `<title>` and meta tags in `index.html`
+- [ ] Update Open Graph / social preview metadata
+- [ ] Update iOS app target name and bundle identifier (Track 2)
+- [ ] Update all docs (PRD, CLAUDE.md, devlogs) to use new name
 
 ---
 
 ## Backlog
 
-- [ ] Register a custom domain (e.g., khlock.com) and update all settings accordingly — Cloudflare Pages custom domain, Clerk production instance domain, Worker CORS allowed origins, DNS records
 - [ ] Keyboard shortcuts — add clock tiles, tab between clocks, edit custom time, etc.
+- [ ] Sync `rel-time` (relative time offset toggle) to cloud — add column to D1 schema, include in API read/write, sync via `useCloudSync`
+- [ ] Increase zone/temp font size on clock tiles for better readability
+- [ ] Add copyright information and footer to the page
+
+---
+
+## Appendix A: How the Database Works
+
+Khlock stores user settings (which cities are added, 24h mode, theme, etc.) in two places that work together.
+
+### The Two-Layer System
+
+| Layer | Technology | Where it lives | Who can access it |
+|-------|-----------|----------------|-------------------|
+| **Local storage** | Browser localStorage | On the user's device, managed by the browser | Only that user, on that specific browser |
+| **Cloud database** | Cloudflare D1 (SQLite on Cloudflare Workers) | On Cloudflare's servers | Only that user, after signing in |
+
+### Local Storage (the default)
+
+Every time a user adds a city, toggles 24h mode, or changes the theme, the app saves that immediately to the browser's local storage. This is what makes the app work without an account — no sign-in needed, no network required.
+
+**Storage keys** (all prefixed `world-khlock-`):
+
+| Key | What it stores |
+|-----|---------------|
+| `zones` | JSON array of city keys (e.g. `["paris_FR", "newYork_US"]`) |
+| `24h` | Whether 24-hour mode is on |
+| `sort-etw` | Whether east-to-west sorting is on |
+| `theme` | `"light"`, `"dark"`, or `"system"` |
+| `rel-time` | Whether relative time offset badges are shown |
+| `sync-snapshot` | Fingerprint of last synced state (for change detection) |
+| `sync-at` | Timestamp of last successful cloud sync |
+
+**Limitations:**
+- Tied to one browser on one device — opening Khlock on another device won't have these cities
+- Cleared if the user clears browser data
+- No backup or history
+
+### Cloud Database (when signed in)
+
+When the user signs in via Clerk, the app also syncs preferences to a Cloudflare D1 database. The entire cloud schema is a single table with one row per user:
+
+```sql
+CREATE TABLE user_preferences (
+  user_id    TEXT PRIMARY KEY,
+  zones      TEXT NOT NULL,       -- JSON array of city keys
+  use_24h    INTEGER DEFAULT 0,   -- 0 = off, 1 = on
+  sort_etw   INTEGER DEFAULT 0,   -- 0 = off, 1 = on
+  theme      TEXT DEFAULT 'system',
+  updated_at TEXT NOT NULL        -- ISO 8601 timestamp
+);
+```
+
+**API endpoints** (Cloudflare Worker at `/api/`):
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/api/preferences` | Fetch user's cloud preferences |
+| `PUT` | `/api/preferences` | Save/update preferences (upsert) |
+| `DELETE` | `/api/account` | Delete all user data |
+
+All endpoints require a Clerk JWT bearer token. The Worker validates tokens against Clerk's JWKS endpoint.
+
+### How Sync Works
+
+The app uses a **local-first** approach:
+
+1. **Every change saves to localStorage immediately** — the UI never waits for the cloud
+2. **If signed in**, changes are also pushed to the cloud after a 1.5-second debounce (so rapid clicks don't flood the server)
+3. **On sign-in from a new device**, cloud data is pulled and applied
+4. **Conflict resolution:** timestamp-based, last-write-wins — if changes were made on two devices while offline, the most recent `updated_at` wins (no field-level merging)
+
+The sync hook (`useCloudSync`) tracks state via the `sync-snapshot` fingerprint. When the fingerprint of current preferences differs from the stored snapshot, the hook knows local changes have occurred since the last sync.
+
+### Limitations
+
+| Limitation | Detail |
+|-----------|--------|
+| Max 16 cities | Enforced by both client and API |
+| No history or undo | Only the latest state is stored |
+| Last-write-wins | Conflicting edits from two devices resolve by timestamp, not merge |
+| Single table | Cloud DB stores preferences only — no analytics or usage data |
+| Clerk dependency | Cloud sync requires Clerk auth service to be configured |
+| `rel-time` not synced | Relative time toggle is local-only (not in the D1 schema) |

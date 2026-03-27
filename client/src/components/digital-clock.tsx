@@ -4,7 +4,7 @@ import { GripVertical, Check, ChevronsUpDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { ALL_CITIES, getCityByKey, searchCities, type TimezoneOption } from "@/lib/city-lookup";
+import { getCityByKey, searchCities, formatCityDetail, type TimezoneOption } from "@/lib/city-lookup";
 import { useWeather, getTemperatureColor } from "@/hooks/use-weather";
 
 function EllipsisCircleIcon({ className }: { className?: string }) {
@@ -114,7 +114,7 @@ function CitySelector({
                   <div className="flex flex-col">
                     <span>{city.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {city.country} ({city.gmtLabel})
+                      {formatCityDetail(city)}
                     </span>
                   </div>
                 </CommandItem>

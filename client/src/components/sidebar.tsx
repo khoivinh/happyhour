@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Monitor, Sun, Moon, Check, Loader2, CloudOff, AlertCircle } from "lucide-react";
+import { Monitor, Smartphone, Sun, Moon, Check, Loader2, CloudOff, AlertCircle } from "lucide-react";
 import { SignInButton, SignOutButton, useUser, useAuth } from "@clerk/clerk-react";
 import { useTheme } from "@/lib/theme-provider";
 import type { SyncStatus } from "@/hooks/use-cloud-sync";
@@ -223,7 +223,12 @@ export function Sidebar({
   }
 
   function getThemeIcon() {
-    if (theme === "system") return <Monitor className="h-[24px] w-[24px]" />;
+    if (theme === "system") {
+      const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
+      return isTouchDevice
+        ? <Smartphone className="h-[24px] w-[24px]" />
+        : <Monitor className="h-[24px] w-[24px]" />;
+    }
     if (theme === "light") return <Sun className="h-[24px] w-[24px]" />;
     return <Moon className="h-[24px] w-[24px]" />;
   }

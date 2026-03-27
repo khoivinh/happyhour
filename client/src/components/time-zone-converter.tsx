@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ALL_CITIES, getCityByKey, searchCities, getTimeInCityZone } from "@/lib/city-lookup";
+import { getAllCities, getCityByKey, searchCities, getTimeInCityZone, formatCityDisplay, formatCityDetail, loadCities, areCitiesLoaded } from "@/lib/city-lookup";
 
 // Track recent touch events so we can suppress synthetic mouse events on mobile.
 // Browsers fire mousedown ~0-100ms after touchstart; if MouseSensor activates on
@@ -153,7 +153,7 @@ function SortableClockItem({
     >
       <DigitalClock
         time={city ? getTimeInCityZone(baseTime, city.offset) : baseTime}
-        cityName={city?.name || zoneKey}
+        cityName={city ? formatCityDisplay(city) : zoneKey}
         timezone={city?.gmtLabel || ""}
         isSelectable
         selectedZoneKey={zoneKey}
@@ -182,7 +182,7 @@ const STORAGE_KEY = "world-khlock-zones";
 function detectLocalCity(): string {
   try {
     const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const match = ALL_CITIES.find(c => c.timezone === localTz);
+    const match = getAllCities().find(c => c.timezone === localTz);
     return match?.key || "london_GB";
   } catch {
     return "london_GB";
@@ -211,10 +211,14 @@ function migrateOldKeys(keys: string[]): string[] {
     "istanbul": "istanbul_TR",
   };
 
-  return keys.map(key => {
+  const migrated = keys.map(key => {
     if (key.includes("_")) return key;
     return oldToNew[key] || key;
-  }).filter(key => getCityByKey(key) !== undefined);
+  });
+  // Only filter invalid keys if city data is loaded; otherwise keep all keys
+  // so we don't wipe the user's zones before data arrives
+  if (!areCitiesLoaded()) return migrated;
+  return migrated.filter(key => getCityByKey(key) !== undefined);
 }
 
 const DEFAULT_ZONES = ["paris_FR", "newYork_US", "losAngeles_US"];
@@ -264,9 +268,13 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     })
   );
 
+  const [citiesLoaded, setCitiesLoaded] = useState(areCitiesLoaded());
+
   useEffect(() => {
-    const localCity = detectLocalCity();
-    setHeroZone(localCity);
+    loadCities().then(() => {
+      setCitiesLoaded(true);
+      setHeroZone(detectLocalCity());
+    });
   }, []);
 
   // Sort zones east-to-west when toggled on; restore original order when toggled off
@@ -332,13 +340,19 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     if (selectedZones.length >= MAX_CLOCKS) return;
     if (selectedZones.includes(zoneKey)) return;
 
+    // Manual add invalidates sort — clear snapshot and disable toggle
+    if (sortEastToWest) {
+      preSortOrderRef.current = null;
+      onSortEastToWestChange(false);
+    }
+
     onZonesChange((prev: string[]) => [zoneKey, ...prev]);
     setNewlyAddedZone(zoneKey);
 
     setTimeout(() => {
       setNewlyAddedZone(null);
     }, 1500);
-  }, [selectedZones, onZonesChange]);
+  }, [selectedZones, onZonesChange, sortEastToWest, onSortEastToWestChange]);
 
   const handleRemoveClock = useCallback((zoneKey: string) => {
     onZonesChange((prev: string[]) => prev.filter((z: string) => z !== zoneKey));
@@ -419,13 +433,13 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     return currentTime || new Date();
   }
 
-  if (!currentTime && !isCustomMode) {
+  if (!citiesLoaded || (!currentTime && !isCustomMode)) {
     const heroCity = getCityByKey(heroZone);
     return (
       <div className="space-y-16">
         <section>
           <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            {heroCity?.name || heroZone}
+            {heroCity ? formatCityDisplay(heroCity) : heroZone}
           </p>
           <p className="mt-1 font-display text-6xl font-black tracking-tight text-foreground md:text-8xl">
             --:--:--
@@ -443,7 +457,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
               return (
                 <div key={zoneKey}>
                   <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                    {city?.name || zoneKey}
+                    {city ? formatCityDisplay(city) : zoneKey}
                   </p>
                   <p className="mt-1 font-display text-3xl font-black tracking-tight text-foreground md:text-4xl">
                     --:--
@@ -469,7 +483,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
       <section>
         <DigitalClock
           time={heroTime}
-          cityName={heroCity?.name || heroZone}
+          cityName={heroCity ? formatCityDisplay(heroCity) : heroZone}
           timezone={heroCity?.gmtLabel || ""}
           isHero
           showSeconds={!isCustomMode}
@@ -540,7 +554,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
                               {city.name}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {city.country} ({city.gmtLabel})
+                              {formatCityDetail(city)}
                             </span>
                           </div>
                         </CommandItem>
@@ -594,7 +608,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
               <div className="opacity-90">
                 <DigitalClock
                   time={getTimeInCityZone(baseTime, activeCity.offset)}
-                  cityName={activeCity.name}
+                  cityName={formatCityDisplay(activeCity)}
                   timezone={activeCity.gmtLabel}
                   isSelectable={false}
                   isDraggable

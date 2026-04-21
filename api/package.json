@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:create": "wrangler d1 create khlock-db",
-    "db:migrate": "wrangler d1 execute khlock-db --file=migrations/0001_create_user_preferences.sql",
-    "db:migrate:local": "wrangler d1 execute khlock-db --local --file=migrations/0001_create_user_preferences.sql"
+    "db:create": "wrangler d1 create happyhour-db",
+    "db:migrate": "wrangler d1 execute happyhour-db --file=migrations/0001_create_user_preferences.sql",
+    "db:migrate:local": "wrangler d1 execute happyhour-db --local --file=migrations/0001_create_user_preferences.sql"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241205.0",

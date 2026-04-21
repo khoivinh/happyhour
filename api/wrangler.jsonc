@@ -1,12 +1,12 @@
 {
-  "name": "khlock-api",
+  "name": "happyhour-api",
   "main": "src/index.ts",
   "compatibility_date": "2024-12-01",
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "khlock-db",
-      "database_id": "a5144c4b-eba5-45bd-84eb-e12119d3f9be"
+      "database_name": "happyhour-db",
+      "database_id": "95eec4c7-ccb0-4530-a4c8-acd9e22f13ca"
     }
   ],
   "vars": {

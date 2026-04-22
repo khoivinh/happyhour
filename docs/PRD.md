@@ -40,12 +40,14 @@ Revise the current UI — refine clock tile interactions, simplify the layout to
 **Figma:** [Add Time Zone section (node 36:3207)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=36-3207)
 
 - [x] Widen the Add Cities menu to span the full body column width (896px desktop, 327px mobile)
-- [ ] Menu overlays clock tiles below (does not push content down) — *currently pushes content down*
+- [x] Menu overlays clock tiles below (does not push content down) — *resolved: dropdown uses `absolute left-0 right-0 z-50` positioning, removed from document flow*
 - [x] On mobile, position the menu near the top of the viewport so the user can see as much of it as possible
 - [x] Keep existing visual style: white background, `#e5e7eb` border, rounded 8px, shadow, search field with magnifying glass icon
 - [x] When a searched city is already displayed, highlight it in the results list; tapping scrolls to and highlights the existing tile — *evolved from original "Already displayed" text approach*
 - [x] Dark-mode border: `#6C6C6C` on the dropdown container
 - [x] **Default view (empty query)** — show a curated top 20 largest cities by metro population, balanced geographically so the list spans Asia, Europe, the Americas, and Africa rather than leaning on any single region. Rendered in the app's existing east-to-west GMT sort. Applies to both the Add Cities dropdown and the per-tile city selector (shared via `searchCities("")` in `client/src/lib/city-lookup.ts`; list defined in `client/src/lib/featured-cities.ts`). *Shipped 2026-04-22.*
+- [x] **Search relevance ranking** *(added 2026-04-22)* — `searchCities` scores each match (4 exact name / 3 prefix / 2 substring / 1 country · province · GMT-label) and tiebreaks by population rank ascending, so e.g. searching "San Francisco" returns San Francisco, CA (US) first, ahead of smaller same-named cities in the Philippines, Argentina, and El Salvador. `TimezoneOption.rank` stores the original population-sorted index as the tiebreak key.
+- [x] **Diacritic-insensitive search** *(added 2026-04-22)* — query is folded through Unicode NFD + combining-mark strip before matching, and cities are pre-indexed on `nameAscii` (from the raw dataset's `city_ascii` field). Typing "sao" finds "São Paulo"; typing "zurich" finds "Zürich"; typing the accented form still works. Country and province fields are folded on the fly.
 
   | # | City | Country | GMT | Timezone | Metro pop. |
   |---|---|---|---|---|---|
@@ -130,6 +132,7 @@ Revise the current UI — refine clock tile interactions, simplify the layout to
   - **Hover:** `#f0f0f0` background (desktop only, `@media(hover:hover)`)
   - **Focus (editing/dropdown open):** `#fdf7ca` background, 1px `#ffedbd` border
   - **Active (being dragged):** `#fdf19d` background, 1px `#ffedbd` border, shadow `0px 1px 2px rgba(0,0,0,0.15)`
+- [x] **State transitions must not shift layout** *(invariant, enforced 2026-04-22)* — the tile base class reserves a 1px transparent border (`border border-transparent`) so switching between default / hover / focus / active states only swaps the border color, never changes outer dimensions or nudges content. Content position and grid row height stay constant across all states. Corresponds to the "active-state dimension preservation" entry in the Design Craft catalog.
 - [x] Desktop tile layout: city name and time stacked vertically, 15px gap between city+time block and zone+temp row
 - [x] Mobile tile layout: city name and time side-by-side (horizontal), 0px gap to zone+temp
 - [x] Clock tile editing: single `type="time"` input with bordered edit UI matching Figma specs
@@ -163,7 +166,7 @@ Revise the current UI — refine clock tile interactions, simplify the layout to
 - [x] Account/login UI designed but intentionally non-functional (deferred to cloud sync phase)
 - [x] Copyright footer "©2026 Design Dept Partners LLC" pinned to bottom of the sidebar panel via `mt-auto` ([Figma 114:1557](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=114-1557))
 - [ ] **Bug:** Login button text vertical alignment — text is 1-2px too close to the top
-- [ ] Reduce sidebar height on mobile by ~20% — currently extends below fold when browser address bar is fully shown
+- [x] Reduce sidebar height on mobile by ~20% — *resolved: sidebar uses `calc(92dvh - ...)`; `dvh` (dynamic viewport height) automatically accounts for the mobile browser's address-bar chrome, so the sidebar never extends below fold*
 
 ### Scope: Cloud Sync & User Accounts *(shipped 2026-03-25)*
 **Auth:** Clerk (Google + Apple social login via dev instance)

@@ -143,7 +143,12 @@ export default function WorldClock() {
         ref={headerRef}
         className="sticky top-0 z-50 bg-background border-b border-border px-6 md:px-12 lg:px-24 py-8"
       >
-        <div className="mx-auto max-w-4xl flex flex-row items-center justify-between gap-4 pl-[10px] pr-[10px] sm:pr-[20px]">
+        {/* pr-[10px] at every breakpoint is load-bearing: the drawer toggle (closed state)
+            must horizontally align with the sidebar's close icon (open state). Sidebar panel
+            sits at right-[-10px] with pr-[20px] inside, putting its close icon at
+            max_w_4xl_right − 10px. The header's pr must match that same offset. Do NOT
+            reintroduce sm:pr-[20px] — it shifts the closed-state icon 10px left of the open-state icon on desktop. */}
+        <div className="mx-auto max-w-4xl flex flex-row items-center justify-between gap-4 pl-[10px] pr-[10px]">
           <h1
             className="flex items-center gap-[10px] min-w-0"
             data-testid="text-app-title"

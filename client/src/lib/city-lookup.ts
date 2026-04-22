@@ -1,3 +1,5 @@
+import { FEATURED_CITY_KEYS } from "./featured-cities";
+
 export interface CityData {
   city: string;
   country: string;
@@ -236,7 +238,12 @@ export function searchCities(query: string, limit = 50): TimezoneOption[] {
   const cities = state.all;
   const q = query.toLowerCase().trim();
   if (!q) {
-    return cities.slice(0, limit);
+    // Empty query: show the curated featured list (top 20 metro-pop, balanced by region).
+    // Defensively drop any keys that don't resolve, so a stale entry can't break the dropdown.
+    const featured = FEATURED_CITY_KEYS
+      .map((key) => state.byKey.get(key))
+      .filter((c): c is TimezoneOption => c !== undefined);
+    return featured.slice(0, limit);
   }
 
   return cities.filter(

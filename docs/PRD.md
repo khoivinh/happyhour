@@ -45,6 +45,32 @@ Revise the current UI — refine clock tile interactions, simplify the layout to
 - [x] Keep existing visual style: white background, `#e5e7eb` border, rounded 8px, shadow, search field with magnifying glass icon
 - [x] When a searched city is already displayed, highlight it in the results list; tapping scrolls to and highlights the existing tile — *evolved from original "Already displayed" text approach*
 - [x] Dark-mode border: `#6C6C6C` on the dropdown container
+- [x] **Default view (empty query)** — show a curated top 20 largest cities by metro population, balanced geographically so the list spans Asia, Europe, the Americas, and Africa rather than leaning on any single region. Rendered in the app's existing east-to-west GMT sort. Applies to both the Add Cities dropdown and the per-tile city selector (shared via `searchCities("")` in `client/src/lib/city-lookup.ts`; list defined in `client/src/lib/featured-cities.ts`). *Shipped 2026-04-22.*
+
+  | # | City | Country | GMT | Timezone | Metro pop. |
+  |---|---|---|---|---|---|
+  | 1 | Tokyo | Japan | GMT+9 | `Asia/Tokyo` | 37M |
+  | 2 | Seoul | South Korea | GMT+9 | `Asia/Seoul` | 25M |
+  | 3 | Shanghai | China | GMT+8 | `Asia/Shanghai` | 29M |
+  | 4 | Beijing | China | GMT+8 | `Asia/Shanghai` | 22M |
+  | 5 | Manila | Philippines | GMT+8 | `Asia/Manila` | 14M |
+  | 6 | Dhaka | Bangladesh | GMT+6 | `Asia/Dhaka` | 23M |
+  | 7 | Delhi | India | GMT+5:30 | `Asia/Kolkata` | 33M |
+  | 8 | Mumbai | India | GMT+5:30 | `Asia/Kolkata` | 21M |
+  | 9 | Istanbul | Turkey | GMT+3 | `Europe/Istanbul` | 16M |
+  | 10 | Moscow | Russia | GMT+3 | `Europe/Moscow` | 12M |
+  | 11 | Cairo | Egypt | GMT+2 | `Africa/Cairo` | 22M |
+  | 12 | Paris | France | GMT+2 | `Europe/Paris` | 12M |
+  | 13 | Kinshasa | DR Congo | GMT+1 | `Africa/Kinshasa` | 16M |
+  | 14 | Lagos | Nigeria | GMT+1 | `Africa/Lagos` | 15M |
+  | 15 | London | UK | GMT+1 | `Europe/London` | 14M |
+  | 16 | São Paulo | Brazil | GMT−3 | `America/Sao_Paulo` | 22M |
+  | 17 | Buenos Aires | Argentina | GMT−3 | `America/Argentina/Buenos_Aires` | 15M |
+  | 18 | New York | USA | GMT−4 | `America/New_York` | 20M |
+  | 19 | Mexico City | Mexico | GMT−6 | `America/Mexico_City` | 22M |
+  | 20 | Los Angeles | USA | GMT−7 | `America/Los_Angeles` | 13M |
+
+  GMT offsets above computed 2026-04-22 (DST-active in northern hemisphere; winter values shift London/Paris/NY/LA by −1 hour).
 
 ### Scope: Remove List View Toggle
 **Files:** `client/src/components/time-zone-converter.tsx`, `client/src/components/digital-clock.tsx`

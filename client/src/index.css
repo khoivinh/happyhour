@@ -228,12 +228,20 @@
   color: #B51818; /* Very hot band */
 }
 
-/* Remove blue highlight that appears when dragging clock tiles */
+/* Touch-gesture config for clock tiles.
+   NOTE: `touch-action: manipulation` was removed 2026-04-23. It was silently
+   breaking mobile drag: on iOS, the tile-level `manipulation` setting overrode
+   the body-level `touch-action: none` that `handleDragStart` applies, so once
+   the 500ms long-press activated, the touch was already committed to scrolling
+   and dnd-kit's drag couldn't take over (~40% failure rate). Viewport meta
+   already has `maximum-scale=1` which disables Safari's 300ms tap delay, so
+   `manipulation` wasn't buying us fast-tap anyway. `touch-manipulation`
+   still lives on the inner tap-only buttons (dropdown trigger, ellipsis)
+   where it matters. */
 [data-testid^="draggable-zone-"] {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   user-select: none;
-  touch-action: manipulation;
 }
 
 /* Subtle pre-activation feedback during long-press on touch devices */

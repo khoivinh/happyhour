@@ -163,7 +163,7 @@ export default function WorldClock() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background flex flex-col">
       {/* Sticky header */}
       <header
         ref={headerRef}
@@ -235,7 +235,9 @@ export default function WorldClock() {
         </div>
       </div>
 
-      <div className="px-6 py-8 md:px-12 lg:px-24">
+      {/* flex-1 lets the tile-grid region grow to fill available space so the
+          SiteFooter below pins to the bottom on short pages. */}
+      <div className="flex-1 px-6 py-8 md:px-12 lg:px-24">
         <div className="mx-auto max-w-4xl">
           <TimeZoneConverter
             isCustomMode={isCustomMode}

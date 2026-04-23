@@ -587,3 +587,64 @@ Animation - backdrop click feedback
     50% { opacity: 0.85; }
   }
 }
+
+/* --------------------------------
+   Happyhour compact overrides (2026-04-23)
+   Shrinks the banner to ~40% of its default vertical footprint:
+   tighter padding, smaller body text, condensed actions, no Silktide
+   logo, compact buttons, and tighter preferences link. Modal (preferences
+   view) is left at defaults since it only opens on explicit interaction.
+-------------------------------- */
+#stcm-wrapper #stcm-banner {
+  padding: 12px 16px;
+  width: 420px;
+  bottom: 12px;
+  right: 12px;
+  border-radius: 10px;
+}
+
+#stcm-wrapper #stcm-banner p {
+  font-size: 12px;
+  line-height: 17px;
+  margin: 0 0 8px;
+}
+
+#stcm-wrapper #stcm-banner a {
+  text-decoration: underline;
+}
+
+#stcm-wrapper #stcm-banner a.stcm-logo {
+  display: none;
+}
+
+#stcm-wrapper #stcm-banner .stcm-actions {
+  gap: 8px;
+  margin-top: 8px;
+}
+
+#stcm-wrapper #stcm-banner .stcm-actions-row {
+  gap: 6px;
+}
+
+#stcm-wrapper #stcm-banner .stcm-preferences-button {
+  font-size: 11px;
+  padding: 2px 0;
+}
+
+#stcm-wrapper .stcm-button {
+  padding: 5px 12px;
+  font-size: 12px;
+  line-height: 17px;
+  border-width: 1px;
+  border-radius: 4px;
+}
+
+@media (max-width: 640px) {
+  #stcm-wrapper #stcm-banner {
+    width: calc(100% - 24px);
+    right: 12px;
+    left: 12px;
+    padding: 10px 14px;
+  }
+}
+

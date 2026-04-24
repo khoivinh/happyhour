@@ -1,0 +1,152 @@
+/* Silktide Consent Manager — Happyhour theming + layout overrides.
+   Matches Figma node 280:4647 (full-width bottom bar). The vendored
+   library files in client/public/silktide-consent-manager.{js,css}
+   are NOT edited so Silktide remains easy to upgrade. */
+
+/* Theme tokens — follow the app's .dark / .happy classes on <html> */
+#stcm-wrapper {
+  --primaryColor: #ffd900;
+  --fontFamily: 'Inter', sans-serif;
+  --backgroundColor: #ffffff;
+  --textColor: #333333;
+}
+html.dark #stcm-wrapper {
+  --backgroundColor: #0c0c0c;
+  --textColor: #f4f0df;
+}
+html.happy #stcm-wrapper {
+  --backgroundColor: #ffd900;
+  --textColor: #333333;
+}
+
+/* Full-width bottom bar — replaces Silktide's default 600px bottom-right modal */
+#stcm-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: none;
+  padding: 18px 20px 20px;
+  border-radius: 0;
+  border-top: 1px solid #525252;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  transform: none;
+  animation: none;
+  opacity: 1;
+}
+@media (max-width: 639px) {
+  #stcm-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+}
+
+/* Description text */
+#stcm-banner .stcm-consent-description,
+#stcm-banner > p {
+  flex: 1 0 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--textColor);
+}
+@media (max-width: 639px) {
+  #stcm-banner .stcm-consent-description,
+  #stcm-banner > p {
+    font-size: 11px;
+  }
+}
+
+/* Action cluster (Accept / Essential / Preferences / Silktide logo) */
+#stcm-banner .stcm-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+@media (max-width: 639px) {
+  #stcm-banner .stcm-actions {
+    width: 100%;
+    gap: 10px;
+  }
+}
+
+#stcm-banner .stcm-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+@media (max-width: 639px) {
+  /* On mobile the Preferences + logo pair spreads to the right of the button group */
+  #stcm-banner .stcm-actions-row {
+    flex: 1 0 0;
+    justify-content: space-between;
+  }
+}
+
+/* Yellow pill buttons (Accept all / Essential only) */
+#stcm-wrapper #stcm-banner .stcm-button-primary {
+  background: var(--primaryColor);
+  color: #333;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  padding: 8px 12px 10px;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+#stcm-wrapper #stcm-banner .stcm-button-primary:hover {
+  background: var(--primaryColor);
+  color: #333;
+  filter: brightness(0.95);
+}
+@media (max-width: 639px) {
+  #stcm-wrapper #stcm-banner .stcm-button-primary {
+    font-size: 9px;
+    padding: 6px 10px 8px;
+  }
+}
+
+/* Preferences as a plain inline text link */
+#stcm-banner .stcm-preferences-button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--textColor);
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+#stcm-banner .stcm-preferences-button:hover {
+  text-decoration: underline;
+}
+@media (max-width: 639px) {
+  #stcm-banner .stcm-preferences-button {
+    font-size: 11px;
+    font-weight: 600;
+  }
+}
+
+/* Silktide S logo sizing + color follows textColor */
+#stcm-banner .stcm-logo {
+  width: 23px;
+  height: 23px;
+  color: var(--textColor);
+  fill: var(--textColor);
+}
+#stcm-banner .stcm-logo svg {
+  width: 100%;
+  height: 100%;
+  fill: inherit;
+}

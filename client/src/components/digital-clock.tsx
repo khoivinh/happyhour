@@ -444,7 +444,7 @@ export function DigitalClock({
             invisible overlay above. */}
         {isDraggable && (
           <div
-            className="flex-shrink-0 flex items-start justify-center pt-2.5 pr-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing"
+            className="flex-shrink-0 flex items-start justify-center pt-[12px] pr-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing"
             title="Drag to reorder"
           >
             <GripVertical className="h-4 w-4" />
@@ -454,7 +454,7 @@ export function DigitalClock({
         {/* City name + timezone (left side) */}
         <div className="flex-1 min-w-0">
           {/* Mobile: city name + time side by side, full content width */}
-          <div className="flex items-start justify-between sm:block">
+          <div className="flex items-start justify-between gap-2 sm:block">
             <div className={`min-w-0 flex-1 sm:flex-none ${isEditing ? "truncate" : "overflow-hidden"}`}>
               {isSelectable && selectedZoneKey && onZoneChange ? (
                 <div data-no-drag>

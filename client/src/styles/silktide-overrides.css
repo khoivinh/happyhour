@@ -1,98 +1,153 @@
 /* Silktide Consent Manager — Happyhour theming + layout overrides.
-   Matches Figma node 280:4647 (full-width bottom bar). The vendored
-   library files in client/public/silktide-consent-manager.{js,css}
-   are NOT edited so Silktide remains easy to upgrade. */
+   Matches Figma node 280:4647 (full-width bottom bar) + dismissed-state nudge.
+   The vendored library files in client/public/silktide-consent-manager.{js,css}
+   are NOT edited so Silktide remains easy to upgrade.
 
-/* Theme tokens — follow the app's .dark / .happy classes on <html> */
+   Specificity note: Silktide's own mobile media query uses
+   `#stcm-wrapper #stcm-banner` (0,2,0). To reliably win, we match or exceed
+   that specificity by prefixing overrides with `#stcm-wrapper`.
+
+   Figma tokens (verified via get_variable_defs on the three consent nodes):
+   |       | Canvas  | Text/Body | Privacy Buttons | Privacy Labels | Border   |
+   | Light | #ffffff | #333333   | #ffd900         | #333333        | #525252  |
+   | Dark  | #171717 | #efefef   | #ffd900         | #333333        | #525252  |
+   | Happy | #ffd900 | #333333   | #333333         | #efefef        | #525252  |
+*/
+
+/* ------------------------------------------------------------------
+   Theme tokens — follow the app's .dark / .happy classes on <html>.
+   ------------------------------------------------------------------ */
 #stcm-wrapper {
-  --primaryColor: #ffd900;
   --fontFamily: 'Inter', sans-serif;
   --backgroundColor: #ffffff;
   --textColor: #333333;
+  --primaryColor: #ffd900;
+  --buttonLabel: #333333;
+  --iconColor: #ffd900;            /* nudge (#stcm-icon) bg — light mode */
+  --iconBackgroundColor: #333333;  /* nudge svg fill — light mode */
 }
 html.dark #stcm-wrapper {
-  --backgroundColor: #0c0c0c;
-  --textColor: #f4f0df;
+  --backgroundColor: #171717;
+  --textColor: #efefef;
+  --primaryColor: #ffd900;
+  --buttonLabel: #333333;
+  --iconColor: #ffd900;
+  --iconBackgroundColor: #333333;
 }
 html.happy #stcm-wrapper {
   --backgroundColor: #ffd900;
   --textColor: #333333;
+  --primaryColor: #333333;         /* inverted: button bg is dark on yellow page */
+  --buttonLabel: #efefef;
+  --iconColor: #333333;            /* nudge inverts too */
+  --iconBackgroundColor: #ffd900;
 }
 
-/* Full-width bottom bar — replaces Silktide's default 600px bottom-right modal */
-#stcm-banner {
+/* ------------------------------------------------------------------
+   Full-width bottom bar (desktop + mobile).
+   Using #stcm-wrapper #stcm-banner to match Silktide's mobile selector.
+   ------------------------------------------------------------------ */
+#stcm-wrapper #stcm-banner {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
+  top: auto;
   width: 100%;
   max-width: none;
+  max-height: none;
+  margin: 0;
   padding: 18px 20px 20px;
-  border-radius: 0;
+  border: 0;
   border-top: 1px solid #525252;
+  border-radius: 0;
   box-shadow: none;
+  background-color: var(--backgroundColor);
+  color: var(--textColor);
   display: flex;
   align-items: center;
   gap: 20px;
+  /* Kill Silktide's slide-in animation which otherwise leaves opacity: 0 */
   transform: none;
   animation: none;
   opacity: 1;
 }
+/* Also force the "loaded" variant to our layout — it may override our base */
+#stcm-wrapper #stcm-banner.stcm-loaded {
+  transform: none;
+  animation: none;
+  opacity: 1;
+}
+
+/* Mobile: stack to column, tighter gap */
 @media (max-width: 639px) {
-  #stcm-banner {
+  #stcm-wrapper #stcm-banner {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
   }
 }
 
-/* Description text */
-#stcm-banner .stcm-consent-description,
-#stcm-banner > p {
-  flex: 1 0 0;
+/* ------------------------------------------------------------------
+   Description text
+   ------------------------------------------------------------------ */
+#stcm-wrapper #stcm-banner .stcm-consent-description,
+#stcm-wrapper #stcm-banner > p {
+  flex: 1 1 0;
   margin: 0;
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
   font-size: 12px;
   line-height: 1.4;
   color: var(--textColor);
 }
 @media (max-width: 639px) {
-  #stcm-banner .stcm-consent-description,
-  #stcm-banner > p {
+  #stcm-wrapper #stcm-banner .stcm-consent-description,
+  #stcm-wrapper #stcm-banner > p {
     font-size: 11px;
   }
 }
 
-/* Action cluster (Accept / Essential / Preferences / Silktide logo) */
-#stcm-banner .stcm-actions {
+/* ------------------------------------------------------------------
+   Action cluster (Accept / Essential / Preferences / Silktide logo)
+   ------------------------------------------------------------------ */
+#stcm-wrapper #stcm-banner .stcm-actions {
   display: flex;
   align-items: center;
   gap: 16px;
   flex-shrink: 0;
+  padding: 0;
+  margin: 0;
 }
 @media (max-width: 639px) {
-  #stcm-banner .stcm-actions {
+  #stcm-wrapper #stcm-banner .stcm-actions {
     width: 100%;
     gap: 10px;
+    flex-wrap: nowrap;
   }
 }
 
-#stcm-banner .stcm-actions-row {
+#stcm-wrapper #stcm-banner .stcm-actions-row {
   display: flex;
   align-items: center;
   gap: 16px;
 }
 @media (max-width: 639px) {
-  /* On mobile the Preferences + logo pair spreads to the right of the button group */
-  #stcm-banner .stcm-actions-row {
-    flex: 1 0 0;
+  /* Mobile: Preferences + logo spread across the remaining row width */
+  #stcm-wrapper #stcm-banner .stcm-actions-row {
+    flex: 1 1 0;
     justify-content: space-between;
   }
 }
 
-/* Yellow pill buttons (Accept all / Essential only) */
+/* ------------------------------------------------------------------
+   Pill buttons (Accept all / Essential only)
+   Override both .stcm-button base + .stcm-button-primary variant.
+   ------------------------------------------------------------------ */
+#stcm-wrapper #stcm-banner .stcm-button,
 #stcm-wrapper #stcm-banner .stcm-button-primary {
   background: var(--primaryColor);
-  color: #333;
+  color: var(--buttonLabel);
   font-family: 'Inter', sans-serif;
   font-weight: 700;
   font-size: 10px;
@@ -103,50 +158,84 @@ html.happy #stcm-wrapper {
   border: 0;
   border-radius: 6px;
   cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
 }
 #stcm-wrapper #stcm-banner .stcm-button-primary:hover {
   background: var(--primaryColor);
-  color: #333;
-  filter: brightness(0.95);
+  color: var(--buttonLabel);
+  filter: brightness(0.92);
 }
 @media (max-width: 639px) {
+  #stcm-wrapper #stcm-banner .stcm-button,
   #stcm-wrapper #stcm-banner .stcm-button-primary {
     font-size: 9px;
     padding: 6px 10px 8px;
   }
 }
 
-/* Preferences as a plain inline text link */
-#stcm-banner .stcm-preferences-button {
+/* ------------------------------------------------------------------
+   Preferences — inline text link
+   ------------------------------------------------------------------ */
+#stcm-wrapper #stcm-banner .stcm-preferences-button {
   background: transparent;
   border: 0;
   padding: 0;
+  margin: 0;
   color: var(--textColor);
   font-family: 'Inter', sans-serif;
   font-weight: 400;
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
 }
-#stcm-banner .stcm-preferences-button:hover {
+#stcm-wrapper #stcm-banner .stcm-preferences-button:hover {
   text-decoration: underline;
 }
 @media (max-width: 639px) {
-  #stcm-banner .stcm-preferences-button {
+  #stcm-wrapper #stcm-banner .stcm-preferences-button {
     font-size: 11px;
     font-weight: 600;
   }
 }
 
-/* Silktide S logo sizing + color follows textColor */
-#stcm-banner .stcm-logo {
+/* ------------------------------------------------------------------
+   Silktide S icon at far right — color follows body text
+   ------------------------------------------------------------------ */
+#stcm-wrapper #stcm-banner .stcm-logo {
   width: 23px;
   height: 23px;
   color: var(--textColor);
   fill: var(--textColor);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
-#stcm-banner .stcm-logo svg {
+#stcm-wrapper #stcm-banner .stcm-logo svg {
   width: 100%;
   height: 100%;
   fill: inherit;
+}
+
+/* ------------------------------------------------------------------
+   Post-consent nudge icon (#stcm-icon) — small circular cookie at
+   bottom-left. Silktide's defaults are 60x60; Figma shows ~32x32.
+   ------------------------------------------------------------------ */
+#stcm-wrapper #stcm-icon {
+  width: 32px;
+  height: 32px;
+  bottom: 16px;
+  left: 16px;
+  padding: 0;
+  border: 0;
+  background-color: var(--iconColor);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+#stcm-wrapper #stcm-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: var(--iconBackgroundColor);
 }

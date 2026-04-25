@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>Happyhour</title>
     <meta name="description" content="The indispensable world clock. It's always that time somewhere." />
+    <!-- Theme-color for the iOS Safari status-bar / address-bar tint. Per
+         OS color-scheme. Manifest's theme_color was previously yellow, which
+         iOS painted across every mode's safe-area; removed there and replaced
+         with these media-scoped meta tags. -->
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171717" media="(prefers-color-scheme: dark)" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- Mobile Safari doesn't reliably honor SVG for apple-touch-icon, and
          Android Chrome wants a manifest-listed PNG for the tab favicon /

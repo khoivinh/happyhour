@@ -1,5 +1,8 @@
 import { SitePageLayout } from "@/components/site-page-layout";
 
+const LINK_CLASS =
+  "font-bold no-underline text-inherit hover:text-[#3B82F6] transition-colors";
+
 export default function Support() {
   return (
     <SitePageLayout title="Support">
@@ -7,9 +10,9 @@ export default function Support() {
         For questions, comments and suggestions,{" "}
         <a
           href="mailto:hellodesigndept@gmail.com"
-          className="font-bold underline text-inherit hover:opacity-80 transition-opacity"
+          className={`${LINK_CLASS} underline`}
         >
-          send an email
+          send us an email
         </a>
         .
       </p>

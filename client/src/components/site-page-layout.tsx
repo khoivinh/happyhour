@@ -21,16 +21,20 @@ export function SitePageLayout({ title, children }: SitePageLayoutProps) {
     <main className="min-h-screen bg-background flex flex-col">
       <header className="bg-background border-b border-border px-6 md:px-12 lg:px-24 py-8">
         <div className="mx-auto max-w-4xl flex flex-row items-center gap-4 pl-[10px] pr-[10px]">
+          {/* Logo + wordmark sizes mirror the home-page header at the
+              non-scrolled top state (world-clock.tsx LOGO_START / WORDMARK_H_START
+              with the 0.73 mobileScale below 500px). Keeping them identical
+              prevents a "jump" when the user navigates between the home page
+              and an ancillary page at scroll-top. */}
           <a href="/" className="flex items-center gap-[10px] min-w-0">
             <HappyhourLogo
               variant={logoVariant}
-              className="shrink-0 max-[499px]:mt-[2px]"
-              style={{ width: "38px", height: "38px" }}
+              className="shrink-0 size-[38px] max-[499px]:size-[27.74px] max-[499px]:mt-[2px]"
             />
             <div className="flex flex-col items-start pt-[9px] shrink-0">
               <HappyhourWordmark
-                className="shrink-0"
-                style={{ height: "43px", width: "auto", color: wordmarkColor }}
+                className="shrink-0 h-[43px] max-[499px]:h-[31.39px] w-auto"
+                style={{ color: wordmarkColor }}
               />
             </div>
             <span className="sr-only">Happyhour</span>

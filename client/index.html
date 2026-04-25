@@ -6,7 +6,12 @@
     <title>Happyhour</title>
     <meta name="description" content="The indispensable world clock. It's always that time somewhere." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <!-- Mobile Safari doesn't reliably honor SVG for apple-touch-icon, and
+         Android Chrome wants a manifest-listed PNG for the tab favicon /
+         add-to-home-screen icon. Both 180×180 and 192/512 PNGs are sips-
+         converted from favicon.svg (per 2026-04-25 spec). -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Happyhour" />

@@ -173,7 +173,11 @@ function CitySelector({
 function formatRelativeOffset(offset: number): string {
   if (offset === 0) return "0HR";
   const sign = offset > 0 ? "+" : "";
-  return `${sign}${offset}HR`;
+  // Preserve sub-hour zones like India (+5:30) → "+10.5HR". Round to two
+  // decimals to guard against float noise; trailing zeros are dropped by
+  // Number's string conversion (10 → "10", 10.5 → "10.5").
+  const value = Math.round(offset * 100) / 100;
+  return `${sign}${value}HR`;
 }
 
 function getDayIndicator(tileTime: Date, heroDate?: Date): "next" | "prev" | null {

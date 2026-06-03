@@ -173,7 +173,7 @@ function SortableClockItem({
         heroDate={heroDate}
         isCustomMode={isCustomMode}
         use24Hour={use24Hour}
-        relativeOffset={showRelativeTime ? Math.round((city?.offset ?? 0) - heroOffset) : undefined}
+        relativeOffset={showRelativeTime ? (city?.offset ?? 0) - heroOffset : undefined}
       />
     </div>
   );
@@ -723,7 +723,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
                   heroDate={heroTime}
                   isCustomMode={isCustomMode}
                   use24Hour={use24Hour}
-                  relativeOffset={showRelativeTime ? Math.round(activeCity.offset - heroOffset) : undefined}
+                  relativeOffset={showRelativeTime ? activeCity.offset - heroOffset : undefined}
                 />
               </div>
             ) : null}

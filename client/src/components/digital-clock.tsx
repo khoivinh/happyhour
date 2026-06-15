@@ -499,7 +499,7 @@ export function DigitalClock({
                   type="time"
                   value={editTime}
                   onChange={(e) => setEditTime(e.target.value)}
-                  className="font-display text-[24px] font-black leading-[36px] tracking-[-0.6px] bg-transparent border-none outline-none appearance-none p-0 flex-1 min-w-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
+                  className="font-display text-[24px] font-black leading-[36px] tracking-[-0.6px] [font-variant-numeric:proportional-nums] [font-feature-settings:'zero'_0] bg-transparent border-none outline-none appearance-none p-0 flex-1 min-w-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                   autoFocus
                 />
                 <button
@@ -554,7 +554,7 @@ export function DigitalClock({
                   type="time"
                   value={editTime}
                   onChange={(e) => setEditTime(e.target.value)}
-                  className="font-display text-[18px] font-black leading-[33px] tracking-[-0.6px] bg-transparent border-none outline-none appearance-none p-0 flex-1 min-w-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
+                  className="font-display text-[18px] font-black leading-[33px] tracking-[-0.6px] [font-variant-numeric:proportional-nums] [font-feature-settings:'zero'_0] bg-transparent border-none outline-none appearance-none p-0 flex-1 min-w-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                   autoFocus
                 />
                 <button

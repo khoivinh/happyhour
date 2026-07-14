@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TimeZoneConverter } from "@/components/time-zone-converter";
 import { Sidebar, DrawerToggleIcon } from "@/components/sidebar";
 import { getCityByKey } from "@/lib/city-lookup";
@@ -11,14 +11,14 @@ import { OfflineBanner } from "@/components/offline-banner";
 import { SiteFooter } from "@/components/site-footer";
 import { track } from "@/lib/analytics";
 
-// Header animation constants
-const SCROLL_RANGE = 120; // px of scroll over which the shrink fully plays out
-const PY_START = 32;      // py-8 = 2rem = 32px
-const PY_END = 12;        // py-3 = 0.75rem = 12px
-const LOGO_START = 38;    // Figma node 182:1510
-const LOGO_END = 25;
-const WORDMARK_H_START = 43; // Figma node 211:2310 desktop (43.392 rounded)
-const WORDMARK_H_END = 28;
+// px of scroll over which the hero shrink fully plays out. The logo bar is ~91px tall,
+// so the hero has locked to the top of the viewport right about when the shrink completes.
+const SCROLL_RANGE = 120;
+
+// The drawer toggle is pinned: it must not move by a single pixel at any scroll offset.
+// 45px puts its 20px-tall icon on the centerline of the logo row (Figma node 329:3393,
+// y=45.196); 39px is the same centerline once the logo scales to 0.73 below 500px.
+const TOGGLE_TOP_DESKTOP = 45;
 
 const USE_24H_KEY = "world-happyhour-24h";
 const SORT_ETW_KEY = "world-happyhour-sort-etw";
@@ -43,46 +43,18 @@ export default function WorldClock() {
   const logoVariant = resolvedTheme === "happy" ? "happy" : "default";
   // Figma spec per theme: light/happy wordmark = #000000, dark = white.
   const wordmarkColor = resolvedTheme === "dark" ? "#FFFFFF" : "#000000";
-  const [sidebarTop, setSidebarTop] = useState(28);
-  const headerRef = useRef<HTMLElement>(null);
-  const logoRef = useRef<SVGSVGElement>(null);
-  const wordmarkRef = useRef<SVGSVGElement>(null);
-  const toggleRef = useRef<HTMLButtonElement>(null);
-
-  // Scroll-driven header shrink + sidebar top tracking
+  // Scroll-driven hero shrink. JS writes one number and nothing else: every size, and the
+  // breakpoint itself, lives in index.css (.hero-time / .hero-clock / .hero-sticky). Writing a
+  // custom property rather than React state keeps this off the render path — no re-render per frame.
   useEffect(() => {
-    function updateHeader() {
+    function updateHeroRatio() {
       const ratio = Math.min(1, Math.max(0, window.scrollY / SCROLL_RANGE));
-      // Shrink logo + wordmark on narrow viewports so the header fits on iPhone SE / small phones.
-      // 0.73 matches the Figma "Mobile Logged In" variant ratio (31.68 / 43.392).
-      const mobileScale = window.innerWidth < 500 ? 0.73 : 1;
-      if (headerRef.current) {
-        const pyBottom = PY_START + (PY_END - PY_START) * ratio;
-        headerRef.current.style.paddingBottom = `${pyBottom}px`;
-      }
-      if (logoRef.current) {
-        const size = (LOGO_START + (LOGO_END - LOGO_START) * ratio) * mobileScale;
-        logoRef.current.style.width = `${size}px`;
-        logoRef.current.style.height = `${size}px`;
-      }
-      if (wordmarkRef.current) {
-        const h = (WORDMARK_H_START + (WORDMARK_H_END - WORDMARK_H_START) * ratio) * mobileScale;
-        wordmarkRef.current.style.height = `${h}px`;
-      }
-      // Update sidebar top to align with the toggle button
-      if (toggleRef.current) {
-        const rect = toggleRef.current.getBoundingClientRect();
-        setSidebarTop(rect.top);
-      }
+      document.documentElement.style.setProperty("--hero-ratio", String(ratio));
     }
 
-    window.addEventListener("scroll", updateHeader, { passive: true });
-    window.addEventListener("resize", updateHeader, { passive: true });
-    updateHeader(); // set initial position
-    return () => {
-      window.removeEventListener("scroll", updateHeader);
-      window.removeEventListener("resize", updateHeader);
-    };
+    window.addEventListener("scroll", updateHeroRatio, { passive: true });
+    updateHeroRatio(); // set initial state
+    return () => window.removeEventListener("scroll", updateHeroRatio);
   }, []);
 
   // Persist settings
@@ -164,62 +136,60 @@ export default function WorldClock() {
 
   return (
     <main className="min-h-screen bg-background flex flex-col">
-      {/* Sticky header */}
-      <header
-        ref={headerRef}
-        className="sticky top-0 z-50 bg-background border-b border-border px-6 md:px-12 lg:px-24 py-8"
-      >
-        {/* pr-[10px] at every breakpoint is load-bearing: the drawer toggle (closed state)
-            must horizontally align with the sidebar's close icon (open state). Sidebar panel
-            sits at right-[-10px] with pr-[20px] inside, putting its close icon at
-            max_w_4xl_right − 10px. The header's pr must match that same offset. Do NOT
-            reintroduce sm:pr-[20px] — it shifts the closed-state icon 10px left of the open-state icon on desktop. */}
-        <div className="mx-auto max-w-4xl flex flex-row items-center justify-between gap-4 pl-[10px] pr-[10px]">
+      {/* Logo bar. Deliberately NOT sticky and with no bottom rule: it scrolls away off the top,
+          leaving the hero clock's rule as the only one at the top of the viewport. The logo and the
+          hero read as a single unit (Figma 329:3241). */}
+      <header className="bg-background px-6 md:px-12 lg:px-24 pt-[29px] pb-[10px]">
+        <div className="mx-auto max-w-4xl flex flex-row items-center pl-[10px]">
           <h1
             className="flex items-center gap-[10px] min-w-0"
             data-testid="text-app-title"
           >
-            <HappyhourLogo
-              ref={logoRef}
-              variant={logoVariant}
-              // mt-[2px] on mobile <500px nudges the scaled logo down so its top edge
-              // aligns with the top of the "H" cap in the wordmark.
-              className="shrink-0 max-[499px]:mt-[2px]"
-              style={{ width: `${LOGO_START}px`, height: `${LOGO_START}px` }}
-            />
             {/* Nameplate: pt-[9px] matches Figma so the logo's vertical center aligns with the wordmark's
                 visual center (not the bounding-box center — the wordmark glyphs sit low in their viewBox). */}
             <div className="flex flex-col items-start pt-[9px] shrink-0">
               <HappyhourWordmark
-                ref={wordmarkRef}
-                className="shrink-0"
-                style={{ height: `${WORDMARK_H_START}px`, width: "auto", color: wordmarkColor }}
+                className="shrink-0 h-[43px] max-[499px]:h-[31.39px] w-auto"
+                style={{ color: wordmarkColor }}
               />
             </div>
+            {/* Round mark sits to the RIGHT of the wordmark (Figma 329:3382 → 329:3381).
+                0.73 below 500px matches the Figma mobile variant ratio (31.68 / 43.392);
+                mt-[2px] there nudges the scaled mark down so its top edge aligns with the
+                top of the "H" cap in the wordmark. */}
+            <HappyhourLogo
+              variant={logoVariant}
+              className="shrink-0 size-[38px] max-[499px]:size-[27.74px] max-[499px]:mt-[2px]"
+            />
             <span className="sr-only">Happyhour</span>
           </h1>
+        </div>
+      </header>
+
+      {/* Menu layer — fixed, mirrors the content column's horizontal layout exactly.
+          The drawer toggle lives HERE rather than in the header for two reasons:
+          (1) the header scrolls away, and the toggle must not move by a single pixel;
+          (2) its horizontal offset and the sidebar's close-icon offset now derive from the
+              same max-w-4xl column, so they align structurally instead of by two padding
+              values that happen to match. The panel sits at right-[-10px] with pr-[20px]
+              inside, putting its close icon at column_right − 10px; right-[10px] here is
+              that same offset. Do NOT give the button a z-index: the panel (z-70) must cover
+              it when open, so the sidebar's own close icon takes over in place. */}
+      <nav
+        aria-label="Main menu"
+        className="fixed inset-x-0 top-0 bottom-0 z-[55] px-6 md:px-12 lg:px-24 pointer-events-none"
+      >
+        <div className="mx-auto max-w-4xl relative h-full">
           <button
-            ref={toggleRef}
             onClick={handleToggleSidebar}
-            className="shrink-0 text-[#6B7280] hover:text-[#374151] transition-colors"
+            className="absolute right-[10px] top-[39px] min-[500px]:top-[45px] pointer-events-auto text-[#6B7280] hover:text-[#374151] transition-colors"
             aria-label={sidebarOpen ? "Close menu" : "Open menu"}
+            aria-expanded={sidebarOpen}
+            aria-controls="app-sidebar"
             data-testid="button-drawer-toggle"
           >
             <DrawerToggleIcon open={sidebarOpen} />
           </button>
-        </div>
-      </header>
-
-      {/* Offline banner — renders a yellow band under the sticky header whenever navigator.onLine is false. */}
-      <div className="px-6 md:px-12 lg:px-24 pt-[10px]">
-        <div className="mx-auto max-w-4xl">
-          <OfflineBanner />
-        </div>
-      </div>
-
-      {/* Sidebar positioning wrapper — fixed, mirrors content horizontal layout */}
-      <div className="fixed inset-x-0 top-0 bottom-0 z-[55] px-6 md:px-12 lg:px-24 pointer-events-none">
-        <div className="mx-auto max-w-4xl relative h-full">
           <Sidebar
             open={sidebarOpen}
             onClose={handleCloseSidebar}
@@ -229,15 +199,27 @@ export default function WorldClock() {
             onToggleSortEastToWest={handleToggleSortEastToWest}
             showRelativeTime={showRelativeTime}
             onToggleShowRelativeTime={handleToggleShowRelativeTime}
-            topOffset={sidebarTop}
+            topOffset={TOGGLE_TOP_DESKTOP}
             syncStatus={syncStatus}
           />
+        </div>
+      </nav>
+
+      {/* Offline banner — a yellow band under the logo bar whenever navigator.onLine is false.
+          The 10px lead-in is on the banner itself, not this wrapper: OfflineBanner renders null
+          when online, and a wrapper with padding would hold that gap open permanently, pushing
+          the hero away from the logo. */}
+      <div className="px-6 md:px-12 lg:px-24">
+        <div className="mx-auto max-w-4xl">
+          <OfflineBanner />
         </div>
       </div>
 
       {/* flex-1 lets the tile-grid region grow to fill available space so the
-          SiteFooter below pins to the bottom on short pages. */}
-      <div className="flex-1 px-6 py-8 md:px-12 lg:px-24">
+          SiteFooter below pins to the bottom on short pages.
+          pt-0: Figma puts the hero immediately below the logo bar — the only gap is the
+          header's own pb-[10px]. */}
+      <div className="flex-1 px-6 pt-0 pb-8 md:px-12 lg:px-24">
         <div className="mx-auto max-w-4xl">
           <TimeZoneConverter
             isCustomMode={isCustomMode}

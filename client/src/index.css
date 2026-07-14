@@ -165,6 +165,55 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Hero clock scroll-shrink — Figma 329:3241 (top) → 329:3521 (scrolled).
+
+   world-clock.tsx writes a single number, --hero-ratio (0 at scroll-top, 1 once
+   fully shrunk). Every size and the breakpoint live here, so the JS never has to
+   know a viewport width. Start values differ per breakpoint; both ends converge
+   on the same 36px compact size.
+   --------------------------------------------------------------------------- */
+:root {
+  --hero-ratio: 0;
+  --hero-time-start: 60px;
+  --hero-ampm-start: 36px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --hero-time-start: 96px;
+    --hero-ampm-start: 48px;
+  }
+}
+
+/* The hero + its rule are one sticky unit. At scroll-top the rule sits 64px below
+   the hero (Figma: hero ends 144, rule at 208); once shrunk the rule is flush against
+   it (both at 114). That gap is this padding, so the rule rides up as you scroll. */
+.hero-sticky {
+  padding-bottom: calc(64px * (1 - var(--hero-ratio)));
+}
+
+.hero-clock {
+  padding-top: calc(20px * var(--hero-ratio));
+  padding-bottom: calc(10px * var(--hero-ratio));
+}
+
+.hero-time {
+  /* Figma leading == font-size in both states, so a unitless 1 covers both; the
+     AM/PM span inherits the number and resolves it against its own font-size. */
+  line-height: 1;
+  letter-spacing: calc(-2.4px + 1.4px * var(--hero-ratio));
+  font-size: calc(
+    var(--hero-time-start) + (36px - var(--hero-time-start)) * var(--hero-ratio)
+  );
+}
+
+.hero-time__ampm {
+  font-size: calc(
+    var(--hero-ampm-start) + (36px - var(--hero-ampm-start)) * var(--hero-ratio)
+  );
+}
+
 
 /* Sidebar open: fade in small box, then expand */
 @keyframes sidebar-open {

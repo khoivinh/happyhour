@@ -301,7 +301,7 @@ export function DigitalClock({
 
   if (isHero) {
     return (
-      <div className="px-[10px] flex flex-col gap-[2px] sm:gap-0 sm:min-h-[144px]">
+      <div className="hero-clock px-[10px] flex flex-col gap-[2px] sm:gap-0">
         <div>
           <div className="flex-1 min-w-0 flex flex-col gap-[2px] sm:gap-0">
             <p
@@ -356,14 +356,16 @@ export function DigitalClock({
                 </div>
               </div>
             ) : (
+              // Size, leading and tracking all scale with --hero-ratio as the page scrolls;
+              // the values and the breakpoint live in index.css under .hero-time.
               <p
-                className="font-display font-black tracking-[-2.4px] text-foreground cursor-pointer hover:text-primary transition-colors whitespace-nowrap"
+                className="hero-time font-display font-black text-foreground cursor-pointer hover:text-primary transition-colors whitespace-nowrap"
                 onClick={handleTimeClick}
                 title="Click to edit time"
                 data-testid="text-hero-time"
               >
-                <span className="text-[60px] leading-[60px] md:text-[96px] md:leading-[96px]">{timeString}</span>
-                {!use24Hour && <span className="text-[36px] leading-[60px] md:text-[48px] md:leading-[96px]">{` ${amPm}`}</span>}
+                <span>{timeString}</span>
+                {!use24Hour && <span className="hero-time__ampm">{` ${amPm}`}</span>}
               </p>
             )}
           </div>

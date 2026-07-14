@@ -532,8 +532,10 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   if (!areSearchCitiesReady() || (!currentTime && !isCustomMode)) {
     const heroCity = getCityOrCachedTile(heroZone);
     return (
-      <div className="space-y-16">
-        <section>
+      // Skeleton mirrors the loaded layout's rule placement — the rule belongs to the hero
+      // block, not the city list. Getting this wrong flashes two rules during load.
+      <div>
+        <section className="sticky top-0 z-40 bg-background border-b border-border pb-16">
           <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             {heroCity ? formatCityDisplay(heroCity) : heroZone}
           </p>
@@ -543,7 +545,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
           <p className="mt-2 text-sm text-muted-foreground">{heroCity?.gmtLabel}</p>
         </section>
 
-        <section className="border-t border-border pt-12">
+        <section className="pt-12">
           <div className="mb-8">
             <span className="text-sm text-muted-foreground">Loading...</span>
           </div>
@@ -575,8 +577,14 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   const activeCity = activeId ? getCityOrCachedTile(activeId) : null;
 
   return (
-    <div className="space-y-16">
-      <section>
+    <div>
+      {/* The hero and its rule are one sticky unit (Figma 329:3521). The logo bar scrolls away
+          above it; this block locks to the top of the viewport and the tiles scroll underneath,
+          which is what bg-background is for — without it they'd show through.
+          z-40 keeps it below the fixed menu layer (z-55) and the sidebar panel (z-70).
+          .hero-sticky supplies the padding-bottom that collapses 64px → 0, so the rule rides up
+          to meet the hero as you scroll. */}
+      <section className="hero-sticky sticky top-0 z-40 bg-background border-b border-border">
         <DigitalClock
           time={heroTime}
           cityName={heroCity ? formatCityDisplay(heroCity) : heroZone}
@@ -592,7 +600,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
         />
       </section>
 
-      <section className="border-t border-border pt-[25px] sm:pt-6">
+      <section className="pt-[25px] sm:pt-6">
         <div className="mb-[25px] sm:mb-8 relative" ref={addZoneRef}>
           <div className="flex items-center gap-[5px] px-[10px] pb-[20px]">
             <button

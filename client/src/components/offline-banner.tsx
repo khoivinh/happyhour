@@ -13,7 +13,7 @@ export function OfflineBanner() {
       role="status"
       aria-live="polite"
       data-testid="offline-banner"
-      className="offline-banner rounded-[5px] p-[10px] text-[10px] leading-[normal] tracking-[0.35px] font-medium"
+      className="offline-banner mt-[10px] rounded-[5px] p-[10px] text-[10px] leading-[normal] tracking-[0.35px] font-medium"
     >
       <span className="font-bold">You’re Currently Offline</span>
       <span className="hidden sm:inline">{"  Weather and sync will resume when you’re back online."}</span>

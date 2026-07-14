@@ -9,21 +9,21 @@ export default function NotFound() {
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Static header — no scroll animation, no drawer (no sidebar on 404). */}
-      <header className="bg-background border-b border-border px-6 md:px-12 lg:px-24 py-8">
-        <div className="mx-auto max-w-4xl flex flex-row items-center gap-4 pl-[10px] pr-[10px] sm:pr-[20px]">
+      {/* Static header — no scroll animation, no drawer (no sidebar on 404).
+          Order, padding and the absent bottom rule mirror the home-page logo bar. */}
+      <header className="bg-background px-6 md:px-12 lg:px-24 pt-[29px] pb-[10px]">
+        <div className="mx-auto max-w-4xl flex flex-row items-center pl-[10px]">
           <a href="/" className="flex items-center gap-[10px] min-w-0">
-            <HappyhourLogo
-              variant={logoVariant}
-              className="shrink-0 max-[499px]:mt-[2px]"
-              style={{ width: "38px", height: "38px" }}
-            />
             <div className="flex flex-col items-start pt-[9px] shrink-0">
               <HappyhourWordmark
-                className="shrink-0"
-                style={{ height: "43px", width: "auto", color: wordmarkColor }}
+                className="shrink-0 h-[43px] max-[499px]:h-[31.39px] w-auto"
+                style={{ color: wordmarkColor }}
               />
             </div>
+            <HappyhourLogo
+              variant={logoVariant}
+              className="shrink-0 size-[38px] max-[499px]:size-[27.74px] max-[499px]:mt-[2px]"
+            />
             <span className="sr-only">Happyhour</span>
           </a>
         </div>

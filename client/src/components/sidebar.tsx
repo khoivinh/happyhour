@@ -242,6 +242,7 @@ export function Sidebar({
       {/* Sidebar panel */}
       <div
         ref={sidebarRef}
+        id="app-sidebar"
         className={`absolute right-[-10px] z-[70] w-[calc(100vw-32px)] sm:w-[320px] bg-[#333] rounded-[15px] shadow-[0_1px_2px_rgba(0,0,0,0.15)] overflow-hidden ${
           open
             ? "pointer-events-auto"

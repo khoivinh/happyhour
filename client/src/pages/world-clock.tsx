@@ -5,8 +5,7 @@ import { getCityByKey } from "@/lib/city-lookup";
 import { useCloudSync } from "@/hooks/use-cloud-sync";
 import { useTheme } from "@/lib/theme-provider";
 import { initZonesFromStorage } from "@/components/time-zone-converter";
-import { HappyhourLogo } from "@/components/icons/happyhour-logo";
-import { HappyhourWordmark } from "@/components/icons/happyhour-wordmark";
+import { LogoBar } from "@/components/logo-bar";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SiteFooter } from "@/components/site-footer";
 import { track } from "@/lib/analytics";
@@ -18,11 +17,17 @@ import { track } from "@/lib/analytics";
 const SCROLL_RANGE = 120;
 
 // The drawer toggle is pinned: it must not move by a single pixel at any scroll offset.
-// 22px aligns the top of its icon with the top of the city name's glyphs once the hero is
-// sticky (measured: city ink top = 22.28px), and — because the logo bar's pt-[13px] plus the
-// nameplate's pt-[9px] also puts the wordmark's ink top at 22px — with the top of the wordmark
+// 32px aligns the top of its icon with the top of the city name's glyphs once the hero is
+// sticky (measured: city ink top = 32.28px), and — because LogoBar's pt-[23px] plus the
+// nameplate's pt-[9px] also puts the wordmark's ink top at 32px — with the top of the wordmark
 // at scroll-top. One value covers both breakpoints: the nameplate's pt-[9px] doesn't scale.
-const TOGGLE_TOP = 22;
+//
+// This ALSO sets the menu panel's position: Sidebar takes it as topOffset and sits at
+// topOffset − 18, with a matching pt-[18px] inside, so the panel's close icon lands exactly on
+// this button and the icon doesn't jump when the menu opens. The panel therefore cannot be moved
+// independently of the toggle — raising this value is the only way to push the panel further from
+// the top of the viewport. At 32 the panel's top edge sits at 14px.
+const TOGGLE_TOP = 32;
 
 const USE_24H_KEY = "world-happyhour-24h";
 const SORT_ETW_KEY = "world-happyhour-sort-etw";
@@ -46,10 +51,7 @@ export default function WorldClock() {
   // Owned here rather than in TimeZoneConverter (where geolocation is resolved) only because
   // SiteFooter — which shows the "allow location" notice — is a sibling, not a descendant.
   const [geoDenied, setGeoDenied] = useState(false);
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const logoVariant = resolvedTheme === "happy" ? "happy" : "default";
-  // Figma spec per theme: light/happy wordmark = #000000, dark = white.
-  const wordmarkColor = resolvedTheme === "dark" ? "#FFFFFF" : "#000000";
+  const { theme, setTheme } = useTheme();
   // Scroll-driven hero shrink. JS writes one number and nothing else: every size, and the
   // breakpoint itself, lives in index.css (.hero-time / .hero-clock / .hero-sticky). Writing a
   // custom property rather than React state keeps this off the render path — no re-render per frame.
@@ -151,38 +153,7 @@ export default function WorldClock() {
     // feedback loop cannot form, and guarantees SCROLL_RANGE is always reachable.
     // lvh (not dvh/svh) keeps the runway intact in every mobile URL-bar state.
     <main className="min-h-[calc(100lvh+120px)] bg-background flex flex-col">
-      {/* Logo bar. Deliberately NOT sticky and with no bottom rule: it scrolls away off the top,
-          leaving the hero clock's rule as the only one at the top of the viewport. The logo and the
-          hero read as a single unit (Figma 329:3241). */}
-      {/* pt-[13px] (not Figma's 29px): 13 + the nameplate's pt-[9px] puts the wordmark's ink top at
-          22px, the same y as the pinned drawer icon and as the city name once the hero is sticky.
-          Deliberate departure from Figma 329:3242 — see docs/2026-07-14-devlog.md. */}
-      <header className="bg-background px-6 md:px-12 lg:px-24 pt-[13px] pb-[10px]">
-        <div className="mx-auto max-w-4xl flex flex-row items-center pl-[10px]">
-          <h1
-            className="flex items-center gap-[10px] min-w-0"
-            data-testid="text-app-title"
-          >
-            {/* Nameplate: pt-[9px] matches Figma so the logo's vertical center aligns with the wordmark's
-                visual center (not the bounding-box center — the wordmark glyphs sit low in their viewBox). */}
-            <div className="flex flex-col items-start pt-[9px] shrink-0">
-              <HappyhourWordmark
-                className="shrink-0 h-[43px] max-[499px]:h-[31.39px] w-auto"
-                style={{ color: wordmarkColor }}
-              />
-            </div>
-            {/* Round mark sits to the RIGHT of the wordmark (Figma 329:3382 → 329:3381).
-                0.73 below 500px matches the Figma mobile variant ratio (31.68 / 43.392);
-                mt-[2px] there nudges the scaled mark down so its top edge aligns with the
-                top of the "H" cap in the wordmark. */}
-            <HappyhourLogo
-              variant={logoVariant}
-              className="shrink-0 size-[38px] max-[499px]:size-[27.74px] max-[499px]:mt-[2px]"
-            />
-            <span className="sr-only">Happyhour</span>
-          </h1>
-        </div>
-      </header>
+      <LogoBar />
 
       {/* Menu layer — fixed, mirrors the content column's horizontal layout exactly.
           The drawer toggle lives HERE rather than in the header for two reasons:

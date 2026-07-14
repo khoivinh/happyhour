@@ -1,0 +1,61 @@
+import { HappyhourLogo } from "@/components/icons/happyhour-logo";
+import { HappyhourWordmark } from "@/components/icons/happyhour-wordmark";
+import { useTheme } from "@/lib/theme-provider";
+
+/** The logo bar, shared by the home page and every content page.
+ *
+ *  This exists as a component — rather than the same markup copy-pasted into three files — because its
+ *  top padding is load-bearing and must not drift. `pt-[23px]` plus the nameplate's `pt-[9px]` puts the
+ *  wordmark's ink top at 32px: the same y as the pinned drawer icon, and as the hero's city name once
+ *  it goes sticky. Home and the content pages have to share that value or navigating between them makes
+ *  the logo jump. That parity has silently broken twice (2026-04-25, then again on 2026-07-14) while it
+ *  was a duplicated literal guarded only by a comment promising the files agreed. A comment is not a
+ *  mechanism; one definition is.
+ *
+ *  Deliberately not sticky and with no bottom rule: it scrolls away off the top, leaving the hero
+ *  clock's rule as the only one at the top of the viewport (Figma 329:3241).
+ */
+export function LogoBar({ linkHome = false }: { linkHome?: boolean }) {
+  const { resolvedTheme } = useTheme();
+  const logoVariant = resolvedTheme === "happy" ? "happy" : "default";
+  // Figma spec per theme: light/happy wordmark = #000000, dark = white.
+  const wordmarkColor = resolvedTheme === "dark" ? "#FFFFFF" : "#000000";
+
+  const lockup = (
+    <>
+      {/* Nameplate: pt-[9px] matches Figma so the round mark's vertical center aligns with the
+          wordmark's visual center (not its bounding-box center). Fixed, so it does not scale with
+          the wordmark below 500px — which is why one icon-top value covers both breakpoints. */}
+      <div className="flex flex-col items-start pt-[9px] shrink-0">
+        <HappyhourWordmark
+          className="shrink-0 h-[43px] max-[499px]:h-[31.39px] w-auto"
+          style={{ color: wordmarkColor }}
+        />
+      </div>
+      {/* Round mark sits to the RIGHT of the wordmark (Figma 329:3382 → 329:3381).
+          0.73 below 500px matches the Figma mobile variant ratio (31.68 / 43.392); mt-[2px] there
+          nudges the scaled mark down so its top edge aligns with the "H" cap in the wordmark. */}
+      <HappyhourLogo
+        variant={logoVariant}
+        className="shrink-0 size-[38px] max-[499px]:size-[27.74px] max-[499px]:mt-[2px]"
+      />
+      <span className="sr-only">Happyhour</span>
+    </>
+  );
+
+  return (
+    <header className="bg-background px-6 md:px-12 lg:px-24 pt-[23px] pb-[10px]">
+      <div className="mx-auto max-w-4xl flex flex-row items-center pl-[10px]">
+        {linkHome ? (
+          <a href="/" className="flex items-center gap-[10px] min-w-0">
+            {lockup}
+          </a>
+        ) : (
+          <h1 className="flex items-center gap-[10px] min-w-0" data-testid="text-app-title">
+            {lockup}
+          </h1>
+        )}
+      </div>
+    </header>
+  );
+}

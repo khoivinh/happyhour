@@ -204,8 +204,11 @@
   padding-bottom: calc(64px * (1 - var(--hero-ratio)));
 }
 
+/* Scaled by --hero-ratio, so this gap only opens up as the hero becomes sticky. At scroll-top the
+   space above the city name already comes from the logo bar sitting above it; adding it statically
+   would double up. 30px puts the sticky city name's ink top at 32px — on the drawer icon's TOGGLE_TOP. */
 .hero-clock {
-  padding-top: calc(20px * var(--hero-ratio));
+  padding-top: calc(30px * var(--hero-ratio));
   padding-bottom: calc(10px * var(--hero-ratio));
 }
 

@@ -1,33 +1,10 @@
-import { HappyhourLogo } from "@/components/icons/happyhour-logo";
-import { HappyhourWordmark } from "@/components/icons/happyhour-wordmark";
-import { useTheme } from "@/lib/theme-provider";
+import { LogoBar } from "@/components/logo-bar";
 
 export default function NotFound() {
-  const { resolvedTheme } = useTheme();
-  const logoVariant = resolvedTheme === "happy" ? "happy" : "default";
-  const wordmarkColor = resolvedTheme === "dark" ? "#FFFFFF" : "#000000";
-
   return (
     <main className="min-h-screen bg-background">
-      {/* Static header — no scroll animation, no drawer (no sidebar on 404).
-          Order, padding and the absent bottom rule mirror the home-page logo bar. */}
-      <header className="bg-background px-6 md:px-12 lg:px-24 pt-[13px] pb-[10px]">
-        <div className="mx-auto max-w-4xl flex flex-row items-center pl-[10px]">
-          <a href="/" className="flex items-center gap-[10px] min-w-0">
-            <div className="flex flex-col items-start pt-[9px] shrink-0">
-              <HappyhourWordmark
-                className="shrink-0 h-[43px] max-[499px]:h-[31.39px] w-auto"
-                style={{ color: wordmarkColor }}
-              />
-            </div>
-            <HappyhourLogo
-              variant={logoVariant}
-              className="shrink-0 size-[38px] max-[499px]:size-[27.74px] max-[499px]:mt-[2px]"
-            />
-            <span className="sr-only">Happyhour</span>
-          </a>
-        </div>
-      </header>
+      {/* No scroll animation and no drawer here (there is no sidebar on 404), but the same logo bar. */}
+      <LogoBar linkHome />
 
       {/* Error hero block — matches Figma 232-3847 */}
       <div className="px-6 md:px-12 lg:px-24 pt-[35px]">

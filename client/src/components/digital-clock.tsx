@@ -58,7 +58,6 @@ interface DigitalClockProps {
   relativeOffset?: number;
   /** When true (hero only), shows a small "Allow location for a closer match." hint
    *  next to the city name. Set by the caller after browser geolocation is denied. */
-  geoDenied?: boolean;
 }
 
 function CitySelector({
@@ -221,7 +220,6 @@ export function DigitalClock({
   onReset,
   use24Hour = true,
   relativeOffset,
-  geoDenied = false,
 }: DigitalClockProps) {
   const rawHours = time.getHours();
   const minutes = time.getMinutes().toString().padStart(2, "0");
@@ -309,17 +307,9 @@ export function DigitalClock({
               data-testid="text-hero-city"
             >
               {cityName}
-              {geoDenied && (
-                <span
-                  className="ml-2 text-[10px] normal-case font-normal tracking-normal text-[#6b7280]"
-                  data-testid="text-hero-geo-denied-hint"
-                >
-                  Allow location for a closer match.
-                </span>
-              )}
             </p>
             {isEditing ? (
-              <div ref={editContainerRef} className="relative">
+              <div ref={editContainerRef} className="hero-edit relative">
                 {/* Desktop edit */}
                 <div className="hidden sm:flex w-full items-center gap-[10px] border border-[#c4c7cc] rounded-[12px] pl-[20px] pr-[25px] py-[10px]">
                   <input
@@ -358,8 +348,11 @@ export function DigitalClock({
             ) : (
               // Size, leading and tracking all scale with --hero-ratio as the page scrolls;
               // the values and the breakpoint live in index.css under .hero-time.
+              // w-fit is load-bearing: as a block child of a flex column this <p> would otherwise
+              // stretch the full column width, putting its click target under the drawer icon —
+              // so a tap that just missed the icon opened the time editor instead.
               <p
-                className="hero-time font-display font-black text-foreground cursor-pointer hover:text-primary transition-colors whitespace-nowrap"
+                className="hero-time w-fit font-display font-black text-foreground cursor-pointer hover:text-primary transition-colors whitespace-nowrap"
                 onClick={handleTimeClick}
                 title="Click to edit time"
                 data-testid="text-hero-time"
@@ -374,7 +367,7 @@ export function DigitalClock({
           className="flex items-center justify-between h-[28px]"
           data-testid="text-hero-timezone"
         >
-          <p className="text-sm text-muted-foreground">
+          <p className="hero-meta text-muted-foreground">
             {timezone}
             {!isCustomMode && weather && (
               <span className={`ml-2 ${getTemperatureColor(weather.celsius)}`} data-testid="text-hero-temperature">

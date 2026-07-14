@@ -11,14 +11,18 @@ import { OfflineBanner } from "@/components/offline-banner";
 import { SiteFooter } from "@/components/site-footer";
 import { track } from "@/lib/analytics";
 
-// px of scroll over which the hero shrink fully plays out. The logo bar is ~91px tall,
-// so the hero has locked to the top of the viewport right about when the shrink completes.
+// px of scroll over which the hero shrink fully plays out. The logo bar is ~75px tall, so
+// the hero has locked to the top of the viewport before the shrink completes.
+// MUST stay in sync with the +120px scroll runway in <main>'s min-height below — that runway
+// is what guarantees this range is always reachable.
 const SCROLL_RANGE = 120;
 
 // The drawer toggle is pinned: it must not move by a single pixel at any scroll offset.
-// 45px puts its 20px-tall icon on the centerline of the logo row (Figma node 329:3393,
-// y=45.196); 39px is the same centerline once the logo scales to 0.73 below 500px.
-const TOGGLE_TOP_DESKTOP = 45;
+// 22px aligns the top of its icon with the top of the city name's glyphs once the hero is
+// sticky (measured: city ink top = 22.28px), and — because the logo bar's pt-[13px] plus the
+// nameplate's pt-[9px] also puts the wordmark's ink top at 22px — with the top of the wordmark
+// at scroll-top. One value covers both breakpoints: the nameplate's pt-[9px] doesn't scale.
+const TOGGLE_TOP = 22;
 
 const USE_24H_KEY = "world-happyhour-24h";
 const SORT_ETW_KEY = "world-happyhour-sort-etw";
@@ -39,6 +43,9 @@ export default function WorldClock() {
     return localStorage.getItem(SHOW_REL_TIME_KEY) === "true";
   });
   const [selectedZones, setSelectedZones] = useState<string[]>(initZonesFromStorage);
+  // Owned here rather than in TimeZoneConverter (where geolocation is resolved) only because
+  // SiteFooter — which shows the "allow location" notice — is a sibling, not a descendant.
+  const [geoDenied, setGeoDenied] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
   const logoVariant = resolvedTheme === "happy" ? "happy" : "default";
   // Figma spec per theme: light/happy wordmark = #000000, dark = white.
@@ -135,11 +142,22 @@ export default function WorldClock() {
   }
 
   return (
-    <main className="min-h-screen bg-background flex flex-col">
+    // The +120px is a scroll runway, not decoration. The hero shrinks by ~94px as you scroll,
+    // which SHORTENS the document; on a page that is only barely scrollable (one row of tiles on
+    // a tall display) that pulls maxScroll below the current scrollY, the browser clamps you back
+    // up, --hero-ratio drops, the hero grows again — and the shrink converges to a fixed point
+    // (measured: 0.24) instead of reaching 1. The logo never fully clears the top and the easing
+    // judders. Flooring main's height decouples the document height from the hero's height, so the
+    // feedback loop cannot form, and guarantees SCROLL_RANGE is always reachable.
+    // lvh (not dvh/svh) keeps the runway intact in every mobile URL-bar state.
+    <main className="min-h-[calc(100lvh+120px)] bg-background flex flex-col">
       {/* Logo bar. Deliberately NOT sticky and with no bottom rule: it scrolls away off the top,
           leaving the hero clock's rule as the only one at the top of the viewport. The logo and the
           hero read as a single unit (Figma 329:3241). */}
-      <header className="bg-background px-6 md:px-12 lg:px-24 pt-[29px] pb-[10px]">
+      {/* pt-[13px] (not Figma's 29px): 13 + the nameplate's pt-[9px] puts the wordmark's ink top at
+          22px, the same y as the pinned drawer icon and as the city name once the hero is sticky.
+          Deliberate departure from Figma 329:3242 — see docs/2026-07-14-devlog.md. */}
+      <header className="bg-background px-6 md:px-12 lg:px-24 pt-[13px] pb-[10px]">
         <div className="mx-auto max-w-4xl flex flex-row items-center pl-[10px]">
           <h1
             className="flex items-center gap-[10px] min-w-0"
@@ -182,7 +200,8 @@ export default function WorldClock() {
         <div className="mx-auto max-w-4xl relative h-full">
           <button
             onClick={handleToggleSidebar}
-            className="absolute right-[10px] top-[39px] min-[500px]:top-[45px] pointer-events-auto text-[#6B7280] hover:text-[#374151] transition-colors"
+            style={{ top: `${TOGGLE_TOP}px` }}
+            className="absolute right-[10px] pointer-events-auto text-[#6B7280] hover:text-[#374151] transition-colors"
             aria-label={sidebarOpen ? "Close menu" : "Open menu"}
             aria-expanded={sidebarOpen}
             aria-controls="app-sidebar"
@@ -199,7 +218,7 @@ export default function WorldClock() {
             onToggleSortEastToWest={handleToggleSortEastToWest}
             showRelativeTime={showRelativeTime}
             onToggleShowRelativeTime={handleToggleShowRelativeTime}
-            topOffset={TOGGLE_TOP_DESKTOP}
+            topOffset={TOGGLE_TOP}
             syncStatus={syncStatus}
           />
         </div>
@@ -232,11 +251,12 @@ export default function WorldClock() {
             showRelativeTime={showRelativeTime}
             selectedZones={selectedZones}
             onZonesChange={setSelectedZones}
+            onGeoDeniedChange={setGeoDenied}
           />
         </div>
       </div>
 
-      <SiteFooter />
+      <SiteFooter geoDenied={geoDenied} />
     </main>
   );
 }

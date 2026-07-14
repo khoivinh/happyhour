@@ -89,6 +89,9 @@ interface TimeZoneConverterProps {
   showRelativeTime: boolean;
   selectedZones: string[];
   onZonesChange: (zones: SetStateAction<string[]>) => void;
+  /** Geolocation is resolved here, but the notice is shown in SiteFooter — a sibling of this
+   *  component, not a descendant — so the flag is reported upward rather than held locally. */
+  onGeoDeniedChange?: (denied: boolean) => void;
 }
 
 interface SortableClockItemProps {
@@ -246,7 +249,7 @@ export function initZonesFromStorage(): string[] {
   return DEFAULT_ZONES;
 }
 
-export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, selectedZones, onZonesChange }: TimeZoneConverterProps) {
+export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, selectedZones, onZonesChange, onGeoDeniedChange }: TimeZoneConverterProps) {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [heroZone, setHeroZone] = useState<string>("london_GB");
   const [newlyAddedZone, setNewlyAddedZone] = useState<string | null>(null);
@@ -287,7 +290,6 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
 
   const [citiesLoaded, setCitiesLoaded] = useState(areCitiesLoaded());
   const [fullLoadFailed, setFullLoadFailed] = useState(didFullCitiesFail());
-  const [geoDenied, setGeoDenied] = useState(false);
 
   // Three-tier load: top (fast, inline bundle) → cache fallback → full (lazy).
   useEffect(() => {
@@ -295,10 +297,10 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
       const tzFallback = detectLocalCity();
       setHeroZone(tzFallback);
       // Upgrade the hero clock to the geographically-closest city once geolocation resolves.
-      // On denial we keep the timezone-derived fallback and surface a hint next to the hero city name.
+      // On denial we keep the timezone-derived fallback and surface a notice in the footer.
       resolveLocalCity(tzFallback).then(({ key, geoDenied: denied }) => {
         setHeroZone((current) => (current === tzFallback ? key : current));
-        if (denied) setGeoDenied(true);
+        if (denied) onGeoDeniedChange?.(true);
       });
     });
 
@@ -596,7 +598,6 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
           isCustomMode={isCustomMode}
           onReset={onReset}
           use24Hour={use24Hour}
-          geoDenied={geoDenied}
         />
       </section>
 

@@ -146,6 +146,17 @@
 }
 
 @layer base {
+  /* The hero clock changes height as you scroll (209px → 115px). Chrome and Firefox respond with
+     scroll anchoring: they nudge scrollTop to keep the content *below* the shrinking element
+     visually still. But scrollTop is exactly what drives --hero-ratio, so the nudge resizes the
+     hero again, which re-triggers the nudge — a feedback loop that pins scrollY short of the
+     bottom and jitters (measured: oscillating 67↔68px, --hero-ratio stuck at 0.56). That is the
+     scroll "shudder". Opting the document out of anchoring breaks the loop.
+     Safari implements no scroll anchoring, so it never had the bug and is unaffected. */
+  html {
+    overflow-anchor: none;
+  }
+
   * {
     @apply border-border;
     /* Override tailwindcss-animate's global transition:all base rule.
@@ -212,6 +223,22 @@
   font-size: calc(
     var(--hero-ampm-start) + (36px - var(--hero-ampm-start)) * var(--hero-ratio)
   );
+}
+
+/* Zone + temperature. Shrinks to the clock tiles' 12px/16px (Tailwind text-xs) once
+   sticky, so the hero's metadata reads at the same size as the tiles' below it. The
+   row keeps its 28px height, which is what holds the rule at y=115 (Figma 329:3521). */
+.hero-meta {
+  font-size: calc(14px + (12px - 14px) * var(--hero-ratio));
+  line-height: calc(20px + (16px - 20px) * var(--hero-ratio));
+}
+
+/* Time-edit box. Once sticky, the drawer icon sits directly over the hero's time row,
+   and a full-width edit box puts its OK button underneath the icon. Reserve the icon's
+   width (25px) plus a 10px gap — but only in proportion to the shrink, so the
+   scroll-top layout, where the icon is still up in the logo bar, is untouched. */
+.hero-edit {
+  max-width: calc(100% - 35px * var(--hero-ratio));
 }
 
 

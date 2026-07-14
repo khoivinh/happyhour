@@ -1,8 +1,12 @@
 # Happyhour — Product Requirements Document
 
+*Last updated 2026-07-14.*
+
 ## Context
 
-Happyhour (formerly Khlock) is a world clock and timezone converter web app (React/TypeScript/Tailwind, deployed on Cloudflare Pages at `happyhour.day`). Phases 1-2 (codebase cleanup, deployment, mobile UX fixes) are complete. The scroll-driven header animation is confirmed smooth. This PRD covers three tracks:
+Happyhour (formerly Khlock) is a world clock and timezone converter web app (React/TypeScript/Tailwind, deployed on Cloudflare Pages at `happyhour.day` — note the Pages **project** is still named `khlock`, which couldn't be renamed in place, so branch previews are `<branch>.khlock.pages.dev`). Phases 1-2 (codebase cleanup, deployment, mobile UX fixes) are complete.
+
+**Track 1 (Web) is feature-complete** as of 2026-07-14; what remains is a maintenance tail (see Recommended Next Steps). Tracks 2 and 3 are specified but **not started**. This PRD covers three tracks:
 
 1. **Phase 3: UI Revisions + Cloud Sync** — revise clock tile interactions, hero clock, city menu, drag-and-drop, and add user accounts with cloud-synced preferences
 2. **iOS Native App** — SwiftUI app with feature parity + home/lock screen widgets + cloud sync
@@ -15,6 +19,16 @@ Happyhour (formerly Khlock) is a world clock and timezone converter web app (Rea
 **Status (2026-04-21):** New outlined wordmark + Happy Mode sidebar icon shipped; Happy Mode promoted to a first-class appearance option alongside light/dark/system. City-loading performance reworked into three tiers (tile cache, top-500 inline bundle, lazy full dataset). Relative-time cloud sync code-complete — awaiting D1 migration + worker deploy. Error-state design specified (this PRD) covering nine failure surfaces; the top three — weather failure, search no-results, empty state — are the first to implement. See `docs/2026-04-21-devlog.md`.
 
 **Status (2026-04-22):** Batch of UX refinements shipped — wordmark color to `#000000` (light/happy), mobile logo vertical alignment, relative-time badge letterspacing, desktop temperature `whitespace-nowrap` fix for wide badges (Sydney +14HR case), duplicate-city edit now flashes the existing tile instead of swapping, mobile drawer-toggle horizontal alignment, sidebar footer "Design Dept Partners LLC" linked to designdept.com, Happy-mode temperature palette revised (four bands), and error states #1/#2/#3/#5/#6/#9 implemented with #4 replaced by a last-tile guard and #8 dropped as unreachable. See `docs/2026-04-22-devlog.md`.
+
+**Status (2026-04-23):** Three new surfaces, none of which existed when this PRD was first written: the **universal footer**, the **content pages** (`/about`, `/privacy`, `/support`), and **Google Analytics + cookie consent** (see the two new scope sections below). Also: brand favicon + OG image refreshed, and the **mobile drag policy settled** — tile-body long-press is disabled on touch devices; mobile drags only from the grip handle, because iOS Safari commits a touch to scroll faster than dnd-kit's 500 ms long-press can claim it. This closed the long-running "touch drag unreliable" bug. See `docs/2026-04-23-devlog.md`.
+
+**Status (2026-04-24):** Drawer icons redesigned (Figma 95:2574 / 95:2576). Cookie-consent re-entry rerouted — the floating Silktide nudge icon is suppressed site-wide in favor of two deliberate entry points (a button on `/privacy` and a footer link), satisfying GDPR Art. 7(3). Silktide preferences modal fully repainted in the dark/yellow palette (Figma 296:3854), CSS-only — vendor JS untouched, so consent storage and the gtag hook stay intact. See `docs/2026-04-24-devlog.md`.
+
+**Status (2026-04-25):** Cookie banner + modal polish (Silktide-S mark visibility, symmetric button padding, thin focus rings, close-X spacing, 15px radius to match the sidebar). Ancillary-page header brought to parity with the home lockup. All bold words on the content pages linkified. Mobile favicon shipped (`apple-touch-icon.png` + `manifest.json`). Late fix: the manifest's `theme_color` was tinting **every** theme's iOS status bar yellow — the meta tag is now driven from in-app theme state in `theme-provider.tsx`. See `docs/2026-04-25-devlog.md`.
+
+**Status (2026-06-02 → 2026-06-14):** Two correctness fixes. Sub-hour relative offsets were rounding away (India at UTC+5:30 displayed as a whole-hour `+X HR`) — `Math.round` replaced so `+5.5HR` survives. And Safari's `<input type=time>` renders tabular figures, whose Zalando Sans `0` is slashed — pinned `proportional-nums` and disabled the `zero` feature. See `docs/2026-06-02-devlog.md`, `docs/2026-06-14-devlog.md`.
+
+**Status (2026-07-14):** **Header rearchitected** — the page used to have two headers (a sticky branding bar and the hero clock), which put two horizontal rules a few pixels apart at the top of the viewport on scroll. The logo bar and hero now read as one unit: the logo scrolls away, the hero time shrinks continuously, and a single rule locks to the top. The drawer toggle is genuinely pinned for the first time (it previously drifted ~7.5 px). See the new **Header Architecture** scope below, and `docs/2026-07-14-devlog.md`.
 
 ---
 
@@ -158,13 +172,13 @@ Revise the current UI — refine clock tile interactions, simplify the layout to
 
 - [x] Sidebar slides in from the right, overlays the body
 - [x] Contains: 24-hour clock toggle, east-to-west sort toggle, relative-time toggle, appearance mode (light/dark/system/happy)
-- [x] Full viewport height with ~28px padding top and bottom
+- [x] ~~Full viewport height with ~28px padding top and bottom~~ — **superseded 2026-07-14.** The panel's top is now *derived from the drawer toggle*: `top: topOffset − 18px`, `height: calc(92dvh − (topOffset − 18 + 28))`. With `TOGGLE_TOP = 32` that puts the panel at **14 px** from the viewport top. Its internal `pt-[18px]` is the matching half of the `− 18` — together they land the panel's close icon exactly on the toggle
 - [x] Full viewport width on mobile
 - [x] Smooth expand/collapse animation; no animation on initial page load
-- [x] Drawer icon position stays consistent between open/closed states
+- [x] **Drawer icon position stays consistent between open/closed states** — *the load-bearing invariant of the whole header.* The toggle carries no `z-index` so the panel (z-70) covers it when open and the panel's own close icon takes over **in place**. Verified Δ0.00 px on both axes, at both breakpoints. Changing the panel's offset without changing `TOGGLE_TOP` breaks this
 - [x] Body scroll locked when sidebar is open
 - [x] Account/login UI designed but intentionally non-functional (deferred to cloud sync phase)
-- [x] Copyright footer "©2026 Design Dept Partners LLC" pinned to bottom of the sidebar panel via `mt-auto` ([Figma 114:1557](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=114-1557))
+- [x] Copyright footer "©2026 Design Dept Partners LLC" — **moved out of the sidebar 2026-04-23** into the universal `SiteFooter` ([Figma 114:1557](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=114-1557))
 - [ ] **Bug:** Login button text vertical alignment — text is 1-2px too close to the top
 - [x] Reduce sidebar height on mobile by ~20% — *resolved: sidebar uses `calc(92dvh - ...)`; `dvh` (dynamic viewport height) automatically accounts for the mobile browser's address-bar chrome, so the sidebar never extends below fold*
 
@@ -200,8 +214,8 @@ Revise the current UI — refine clock tile interactions, simplify the layout to
 **Figma:** [Header wordmark (70:2208)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=70-2208), [Dark-mode header (114:1333)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=114-1333), [Happy Mode sidebar (198:1789)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=198-1789), [Mobile header (6:2)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=6-2)
 
 - [x] New outlined wordmark SVG (`HappyhourWordmark`) with fills bound to `currentColor`; logo fixed to 38 px, gap to 10 px. Wordmark color: light + happy = `#000000` *(revised 2026-04-22 from `#333333`)*, dark = `#FFFFFF`. On mobile `<500 px`, the logo gets a `mt-[2px]` offset so its top edge aligns with the "H" cap
-- [x] Scroll animation interpolates logo + wordmark heights (replaces the prior h1 font-size approach)
-- [x] Mobile (<500 px) scales the wordmark to 73 % per the Figma mobile variant
+- [x] ~~Scroll animation interpolates logo + wordmark heights~~ — **superseded 2026-07-14.** The logo bar no longer animates or sticks at all; it simply scrolls away, and the *hero clock* is what shrinks. See **Header Architecture** below
+- [x] Mobile (<500 px) scales the wordmark to 73 % per the Figma mobile variant *(now a CSS `max-[499px]:` breakpoint, not a JS `window.innerWidth` check)*
 - [x] Happy Mode promoted to a first-class theme option — `system → light → dark → happy` cycle in the Appearance control
 - [x] Happy Mode palette: rich yellow (`#FFD900` accent), yellow smiley logo variant, dedicated stroked-smile sidebar icon (`HappyModeIcon`)
 - [x] Happyhour logo canonicalized to yellow circle + black face; `default` and prior `dark` variants collapsed (both render identically) — `happy` variant remains distinct
@@ -216,6 +230,53 @@ Revise the current UI — refine clock tile interactions, simplify the layout to
 - [x] Public helper `getCityOrCachedTile(key)` falls through tier 2 → tier 3 → tier 1 cache
 - [x] New npm script `build:top-cities` — re-run when `cities.json` is regenerated from GeoNames
 
+### Scope: Header Architecture *(rearchitected 2026-07-14)*
+**Files:** `client/src/pages/world-clock.tsx`, `client/src/components/logo-bar.tsx`, `client/src/components/time-zone-converter.tsx`, `client/src/components/digital-clock.tsx`, `client/src/index.css`
+**Figma:** [Default (329:3241)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=329-3241), [Scrolled (329:3521)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=329-3521)
+
+**Problem:** the page had two things that behaved like headers — a `sticky` branding bar with a `border-b`, and the hero clock. On scroll, the bar's rule and the city grid's rule both parked near the top of the viewport, showing two horizontal rules a few pixels apart.
+
+- [x] **Logo bar scrolls away.** No longer `sticky`, no bottom rule. Extracted to `components/logo-bar.tsx` and shared by every page
+- [x] **Hero clock is the sticky element.** It carries the only rule, and shrinks continuously as you scroll (desktop 96→36 px, mobile 60→36 px; AM/PM 48→36 px). The rule *travels* from y=208 up to the top rather than being glued to the hero — implemented as an interpolated `padding-bottom`, since Figma's two frames prove the 64 px gap collapses to 0
+- [x] **One number drives it.** A scroll handler writes a single custom property `--hero-ratio` (0→1) to `documentElement`; every size *and the breakpoint* live in `index.css`. Keeps `DigitalClock` dumb, stays off the React render path (no re-render per frame), and replaced a JS `window.innerWidth` check with a media query
+- [x] **The drawer toggle is pinned.** It must not move by a single pixel at any scroll offset. It lives in a fixed menu layer that shares the sidebar's `mx-auto max-w-4xl` column, so toggle↔sidebar-close-icon alignment is *structural* rather than two padding values that happen to match. Measured Δ0.00 px. (Note: it was **never actually pinned before** — it sat in the header's `items-center` row and drifted ~7.5 px as the wordmark shrank; the sidebar compensated by re-measuring it every scroll frame)
+- [x] **One shared baseline at 32 px** *(revised 2026-07-14 from 22 px)* — the drawer icon, the wordmark's ink top at scroll-top, and the sticky city name's ink top all land on it. Set by `TOGGLE_TOP`, `LogoBar`'s `pt-[23px]`, and `.hero-clock`'s `padding-top` respectively
+- [x] **The menu panel's position is derived, not chosen.** `Sidebar` sits at `top: topOffset − 18px` with a matching `pt-[18px]` inside, so its close icon lands exactly on the drawer toggle. **Raising `TOGGLE_TOP` is the only way to move the panel down** — it cannot move independently without the icon visibly jumping when the menu opens
+
+> **Invariant — change one, re-measure all four.** `TOGGLE_TOP` (`world-clock.tsx`), `LogoBar`'s top padding, `.hero-clock`'s `padding-top`, and the sidebar's `topOffset − 18` are one interlocked system. The logo bar's padding is shared by home *and* the content pages; when it lived as a copy-pasted literal guarded only by a comment, that parity silently broke **twice** (2026-04-25, 2026-07-14). It is now one component for exactly that reason.
+
+**Two browser behaviors worth knowing** (both cost real debugging time — see `docs/2026-07-14-devlog.md`):
+
+| Behavior | Effect | Fix |
+|---|---|---|
+| **Scroll anchoring** (Chrome/Firefox; Safari implements none) | The hero shrinking made the browser nudge `scrollTop` to hold the content below still — but `scrollTop` *drives* the shrink, so each nudge re-triggered itself. A closed loop: `scrollY` oscillated 67↔68 forever and the ratio stalled at 0.56. This was the reported "shudder" | `html { overflow-anchor: none }` |
+| **Document-height feedback** | The hero shrinking by ~94 px shortens the page, which can clamp `scrollY` below the live range on a barely-scrollable viewport | `min-h-[calc(100lvh+120px)]` on `<main>` — a scroll runway that decouples document height from hero height, guaranteeing `SCROLL_RANGE` is always reachable |
+
+### Scope: Universal Footer + Content Pages *(shipped 2026-04-23)*
+**Files:** `client/src/components/site-footer.tsx`, `client/src/components/site-page-layout.tsx`, `client/src/pages/{about,privacy,support}.tsx`, `client/src/App.tsx`
+**Figma:** [Footer (272:4560)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=272-4560), [About (272:4605)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=272-4605), [Privacy (250:4243)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=250-4243), [Support (272:4634)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=272-4634)
+
+- [x] `SiteFooter` — universal across home + all content pages. Row 1: `©2026 Design Dept Partners LLC` with a `designdept.com` link. Row 2: `About • Privacy • Cookie Preferences • Support`. The copyright block moved here out of the sidebar
+- [x] `SitePageLayout` — shared shell for content pages: the same `LogoBar` (linked home, no drawer), an H1, a body slot, and the footer. `min-h-screen flex flex-col` pins the footer on short pages
+- [x] Routes `/about`, `/privacy`, `/support` registered in `App.tsx` (wouter). All `mailto` links → `hellodesigndept@gmail.com`
+- [x] Bold words are links (`hover:#3B82F6`); the email link is the only underlined one
+- [x] Footer carries large top/bottom padding (`pt-[220px] pb-[120px]`) so the fixed cookie bar lands over empty background rather than over footer content
+- [x] **Geo-denied notice lives here** *(moved 2026-07-14)* — `SiteFooter` takes an optional `geoDenied` prop and renders the "Allow location for a closer match" line above the copyright. See error state #5
+
+### Scope: Analytics + Cookie Consent *(shipped 2026-04-23 → 2026-04-25)*
+**Files:** `client/index.html`, `client/src/lib/analytics.ts`, `client/src/lib/cookie-consent.ts`, `client/src/styles/silktide-overrides.css`, `client/public/silktide-consent-manager.{js,css}`, `client/src/types/silktide.d.ts`
+**Figma:** [Banner (280:4647)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=280-4647), [Preferences modal (296:3854)](https://www.figma.com/design/ykzuXYZ4gnogbNKZeV3Q1H/Happyhour-Design?node-id=296-3854)
+
+- [x] **Google Analytics 4** — measurement ID `G-QMLPKD6XBQ`, `send_page_view: false` (wouter drives page views manually via `trackPageView` on route change). `client/src/lib/analytics.ts` exposes a thin `track(event, params)` wrapper that **no-ops in dev, when gtag isn't loaded, or when `navigator.doNotTrack === '1'`**
+- [x] Tier-1 events instrumented: `city_added`, `city_removed`, `appearance_changed`, `sidebar_opened`, `toggle_24h`, `toggle_east_west_sort`, `toggle_relative_time`, `custom_time_set`, `custom_time_reset`
+- [x] **Consent Mode 2.0, denied by default.** `analytics_storage` and `ad_storage` both start `'denied'` in `index.html`; Silktide flips `analytics_storage` to `'granted'` only on affirmative opt-in. Nothing fires before the user consents
+- [x] **Silktide consent manager, self-hosted** (copied from Getbumpr — no external dependency, no third-party request). Two consent types only: Necessary + Analytics
+- [x] **Vendor JS is never patched.** All visual work is CSS overrides in `silktide-overrides.css`, which keeps consent storage and the gtag hook intact. Overrides set the vendor's custom properties (`--primaryColor`, `--backgroundColor`, `--textColor`, `--fontFamily`) at `#stcm-wrapper` and **must match Silktide's selector specificity** (`#stcm-wrapper #stcm-banner`, not bare `#stcm-banner`) or they silently lose the cascade
+- [x] **Happy mode inverts the buttons** (dark `#333` bg, `#efefef` text) — yellow-on-yellow is unreadable. A `--buttonLabel` custom property lets the label flip independently of the other themes
+- [x] **Re-entry is deliberate, not a floating icon.** Silktide's post-consent nudge (`#stcm-icon`) is hidden site-wide; consent is re-opened from a yellow button on `/privacy` **and** a "Cookie Preferences" footer link, both calling `openCookiePreferences()`. Two entry points satisfy GDPR Art. 7(3) ("as easy to withdraw as to give")
+- [x] Preferences modal repainted to Figma: dark `#151D27` / yellow `#FFD900`, custom close-X (two 3×17 rounded rects at ±45°, rebuilt via pseudo-elements because Silktide's default is a ~46×46 thick-X), outlined-pill toggles (1.5px stroke, r=5 knob), backdrop dim matching the sidebar's `bg-black/30`
+- [x] **Font substitution (standing exception):** Figma specifies Libre Franklin; it is not loaded, so it substitutes to Inter at the same size/weight/leading without asking. This is the *only* pre-approved Figma substitution
+
 ### Out of Scope (Phase 3)
 - Theme/color palette changes (current palette is close to final)
 
@@ -229,7 +290,7 @@ Inventory of failure surfaces in the app and where each appears in the UI. Recom
 | 2 | City search: no results | **Inside the Add Cities dropdown** and the per-tile city selector — replace the current `CommandEmpty` text. Single line, muted. | `Can’t find “{query}”` | **Shipped 2026-04-22** |
 | 3 | Offline / no network | **Global banner slot** directly below the sticky header. Full-width, rounded 5px, `p-[10px]`, theme-aware colors (see below). Driven by `navigator.onLine` + `online`/`offline` window events via `useOnlineStatus`. `role="status" aria-live="polite"`. Auto-hides on reconnect. | Desktop: **`You're Currently Offline`** (bold) + `Weather and sync will resume when you're back online.` Mobile: only the bold headline | **Shipped 2026-04-22** |
 | 4 | ~~Empty state (no cities)~~ | **Replaced with a last-tile guard** (see Clock Tile Design Refinements). `handleRemoveClock` no-ops when only one zone remains; the ellipsis button is hidden on the last tile. | — | **Shipped 2026-04-22** |
-| 5 | Geolocation denied | **Inline trailing text next to the hero city name.** Renders when `resolveLocalCity()` resolves with `geoDenied: true` (PositionError.PERMISSION_DENIED). No dismiss `×` — hint stays until the permission state changes (matches Figma 232-3671). | `Allow location for a closer match.` — 10px, non-uppercase, `#6b7280`, appended after the city name with `ml-2` | **Shipped 2026-04-22** |
+| 5 | Geolocation denied | **In the footer, above the copyright line** *(moved 2026-07-14; was inline next to the hero city name)*. The hero city `<p>` has a fixed `h-[20px]`, so on mobile the hint wrapped and collided with the time display. State is resolved in `TimeZoneConverter`, lifted to `world-clock.tsx` via `onGeoDeniedChange`, and passed to `SiteFooter` — whose `geoDenied` prop is optional, so the content pages need no change. No dismiss `×`; the hint stays until the permission state changes. | `Allow location for a closer match.` — 12px, `#6b7280` | **Shipped 2026-04-22, relocated 2026-07-14** |
 | 6 | Full city DB fails to load | **Footer of the Add Cities dropdown**. Renders when `didFullCitiesFail()` returns true (the `loadCities()` import rejected). | `Showing top 500 cities — full list unavailable.` — 11px muted, `border-t` on container | **Shipped 2026-04-22** |
 | 7 | Cloud sync failure | **Existing `SyncStatusIndicator` in the sidebar** — no additional UI. Current "Sync error" state with `AlertCircle` icon is the final treatment. No separate retry button; sync retries on the next debounced change. | Sidebar indicator only | **Final (no change)** |
 | 8 | ~~Invalid time input~~ | **Dropped.** Investigation 2026-04-22 confirmed the native `<input type="time">` prevents empty/malformed submissions from reaching `handleUpdateClick`, which also has an `if (editTime)` guard. No observable error state. | — | **N/A** |
@@ -433,17 +494,32 @@ Example (custom-time meeting share): `https://happyhour.day/s?z=paris_FR,newYork
 
 ### Web (Track 1)
 - Visual inspection on Chrome mobile emulator (390x844 iPhone 14)
-- Test both light and dark modes
+- Test **all four** appearance modes (light / dark / system / happy) — not just light and dark
 - Verify grid layout at 375px, 768px, 1024px, 1440px
 - Confirm drag-to-reorder: drop indicator always on LEFT, correct opacity for ghost (50%) and overlay (90%)
-- Verify long-press drag works on tile body (600ms) and drag handle (150ms)
+- Verify drag activation: **desktop** — mouse from anywhere on the tile body; **touch** — from the grip handle only (tile-body long-press is deliberately disabled on `(pointer: coarse)`; see the mobile drag policy)
 - Verify "Reset Time" text link appears in hero zone/temp row in custom time mode and resets correctly
 - Verify Add Cities menu spans full body width, positions near top on mobile
 - Verify already-displayed cities are highlighted in search results, tapping scrolls to tile
 - Verify Next Day / Prev Day badges appear for clocks on different calendar days
-- Verify ellipsis icon opens native confirm dialog and removes tile on confirmation
+- Verify ellipsis icon opens native confirm dialog and removes tile on confirmation; the last remaining tile has no ellipsis (last-tile guard)
+- Verify duplicate city selection leaves the editing tile unchanged and **flashes the existing tile** *(revised 2026-04-22 — it used to swap positions, which triggered a stale-editing-state bug)*
 - Verify sidebar: opens/closes smoothly, toggles work, body scroll locked when open
-- Verify duplicate city change swaps tiles instead of crashing
+
+**Header geometry** *(added 2026-07-14 — measure these, don't eyeball them)*
+- The drawer toggle's rect must be **identical at every scroll offset** (0 / 60 / 120 / 400 / 2000) and **Δ0.00 px** against the sidebar's close icon when open. This is the invariant the whole header rests on
+- Drawer icon top, wordmark ink top (scroll-top), and sticky city-name ink top all land on the same baseline (32 px)
+- Wordmark ink top is identical on `/`, `/about`, `/privacy`, `/support`, `/nope` — at **both** breakpoints. The wordmark scales 0.73 below 500 px while the nameplate's `pt-[9px]` does not, so the two breakpoints must be checked independently
+- `--hero-ratio` reaches exactly **1.0** at the bottom of the scroll range, and `scrollHeight` stays **constant** across the scroll (the scroll-anchoring regression test)
+- Exactly **one** horizontal rule is visible at the top of the viewport at any scroll offset
+- The sticky hero's background is opaque in all four themes
+
+**Consent + analytics**
+- Nothing fires before affirmative opt-in: `analytics_storage` is `denied` on first load
+- Both re-entry points (the `/privacy` button and the footer link) open the preferences modal
+- Toggling Analytics in the modal flips `analytics_storage` in gtag consent mode
+- `track()` no-ops when `navigator.doNotTrack === '1'`
+
 - Deploy to https://happyhour.day/ and test on real device
 
 ### iOS (Track 2)
@@ -471,21 +547,29 @@ Example (custom-time meeting share): `https://happyhour.day/s?z=paris_FR,newYork
 
 ## Recommended Next Steps
 
-### Batch A — Quick fixes
-1. Login button text vertical alignment (1-2px CSS tweak)
-2. New Delhi city name wrapping (span full tile width, maintain left alignment)
-3. Sidebar mobile height (reduce ~20%)
+*Rewritten 2026-07-14. The previous list had five items, three of which had already shipped — Add Cities overlay, sidebar mobile height, and touch-drag reliability. Track 1 (Web) is now feature-complete; what remains is a short maintenance tail plus the two unstarted tracks.*
 
-### Batch B — Drag fixes
-4. Drag overlay vertical spacing mismatch (match resting tile sizing)
-5. Touch drag unreliable on left column (sensor tuning)
+### Blocking — needs your action, not code
+1. **Apply the D1 migration + deploy the API** so the relative-time toggle actually syncs to the cloud. Client and worker code have been complete since 2026-04-21; only the deploy is outstanding. From `api/`: `npx wrangler d1 migrations apply happyhour-db --local`, then `--remote`
 
-### Batch C — UI enhancements
-6. Add Cities menu overlay (float over tiles, not push down)
-7. User name display redesign (Figma node 114:1557)
+### Batch A — Known open bugs (all cosmetic, none blocking)
+2. Login button text vertical alignment — 1-2px too close to the top
+3. Drag overlay vertical spacing differs from the resting tile
+4. "New Delhi" city-name wrapping — let the name span the full tile width before truncating. *May already be resolved by the 2026-04-23 mobile long-name `gap-2` fix; verify before working it*
+5. Signed-in user name display — redesign to Figma 114:1557
 
-### Then:
-8. Begin Track 2 (iOS native app), using the finalized web app as the reference design
+### Batch B — Verification debt
+6. **Real-device QA.** The header's scroll shrink is a *feel* thing and has only ever been measured headlessly. Also unverified on device: mobile drag (dnd-kit handle-only policy), the iOS home-screen icon, and the Android Chrome tab favicon
+7. **Playwright coverage.** The repo has **no test suite** — the `data-testid` attributes are unreferenced hooks. The header geometry is the strongest candidate for the first tests, since it's a system of four interlocked values that has already broken twice. The cookie flow and the `/about` `/privacy` `/support` routes are next
+8. Cross-browser pass on the cookie banner + preferences modal across all three themes
+
+### Then — pick a track
+9. **Track 3 (Sharing)** is the cheaper of the two: it's web-only, needs no backend in v1, and is already specified in detail below
+10. **Track 2 (iOS native app)**, using the finished web app as the reference design
+
+### Housekeeping
+- `docs/` contains ~10 iCloud duplicate files (`… 2.md`). Harmless, but worth a sweep
+- `docs/BACKLOG.md` still lists the cookie preferences modal as pending — it shipped 2026-04-24
 
 ---
 
@@ -511,7 +595,7 @@ Example (custom-time meeting share): `https://happyhour.day/s?z=paris_FR,newYork
 ### Changes Required (completed 2026-04-20)
 
 - [x] Register domain — `happyhour.day` on Namecheap
-- [ ] Rename GitHub repository — *pending (Phase B.1)*
+- [x] Rename GitHub repository — now `khoivinh/happyhour`
 - [x] Update `package.json` name field
 - [x] Update heading text in `client/src/components/` (header renders brand wordmark + smiley logo)
 - [x] Update Clerk app (production instance on `clerk.happyhour.day`)
@@ -529,6 +613,8 @@ Example (custom-time meeting share): `https://happyhour.day/s?z=paris_FR,newYork
 
 - [ ] Keyboard shortcuts — add clock tiles, tab between clocks, edit custom time, etc.
 - [ ] Increase zone/temp font size on clock tiles for better readability
+- [ ] Handle affordance on mobile — the grip is a 16×16 icon at 40% opacity. Now that touch drag is handle-only, discoverability matters more; consider an opacity bump or an edge hint under `(pointer: coarse)`
+- [ ] Tier-2 analytics events — `search_used`, `sign_in` / `sign_out`, `footer_link_clicked`. Not wired; defer unless needed
 - [ ] Sharing: dynamic OG images — Worker-rendered preview showing selected cities + times (v2.0 of Track 3)
 - [ ] Sharing: server-generated short IDs with optional expiry (v2.0 of Track 3; requires new D1 table + API endpoints)
 
@@ -560,6 +646,14 @@ Every time a user adds a city, toggles 24h mode, or changes the theme, the app s
 | `rel-time` | Whether relative time offset badges are shown |
 | `sync-snapshot` | Fingerprint of last synced state (for change detection) |
 | `sync-at` | Timestamp of last successful cloud sync |
+
+Three more keys don't carry the `world-happyhour-` prefix:
+
+| Key | What it stores |
+|-----|---------------|
+| `happyhour:tile-cache` | Full `TimezoneOption` metadata per selected zone, so returning users render tiles synchronously on first paint even for cities outside the top-500 (Tier 1 of the city-loading system) |
+| `silktideCookieChoice_*` | Cookie-consent decisions, written by the Silktide vendor script |
+| `stcm.*` | Silktide internal state |
 
 **Limitations:**
 - Tied to one browser on one device — opening Happyhour on another device won't have these cities

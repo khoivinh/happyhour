@@ -23,4 +23,5 @@ World clock + timezone converter (fka Khlock). No backend; weather via Open-Mete
 
 ## Pointers
 - Key files: `client/src/pages/world-clock.tsx`, `components/digital-clock.tsx`, `components/time-zone-converter.tsx`
-- Design doc: `docs/PRD.md` · Devlogs: `docs/` (latest 2026-06-14)
+- Design doc: `docs/PRD.md` · Devlogs: `docs/` (latest 2026-07-14)
+- Active branch: `alt-header` (`54affe8`) — preview at `alt-header.khlock.pages.dev` (Pages project is still named `khlock`)

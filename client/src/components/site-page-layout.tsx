@@ -22,7 +22,7 @@ export function SitePageLayout({ title, children }: SitePageLayoutProps) {
       {/* Mirrors the home-page logo bar exactly — same order (mark to the right of the wordmark),
           same padding, and no bottom rule — so navigating between home and an ancillary page at
           scroll-top produces no jump. These pages have no hero clock, so nothing is sticky here. */}
-      <header className="bg-background px-6 md:px-12 lg:px-24 pt-[29px] pb-[10px]">
+      <header className="bg-background px-6 md:px-12 lg:px-24 pt-[13px] pb-[10px]">
         <div className="mx-auto max-w-4xl flex flex-row items-center pl-[10px]">
           <a href="/" className="flex items-center gap-[10px] min-w-0">
             <div className="flex flex-col items-start pt-[9px] shrink-0">

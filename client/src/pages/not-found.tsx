@@ -11,7 +11,7 @@ export default function NotFound() {
     <main className="min-h-screen bg-background">
       {/* Static header — no scroll animation, no drawer (no sidebar on 404).
           Order, padding and the absent bottom rule mirror the home-page logo bar. */}
-      <header className="bg-background px-6 md:px-12 lg:px-24 pt-[29px] pb-[10px]">
+      <header className="bg-background px-6 md:px-12 lg:px-24 pt-[13px] pb-[10px]">
         <div className="mx-auto max-w-4xl flex flex-row items-center pl-[10px]">
           <a href="/" className="flex items-center gap-[10px] min-w-0">
             <div className="flex flex-col items-start pt-[9px] shrink-0">

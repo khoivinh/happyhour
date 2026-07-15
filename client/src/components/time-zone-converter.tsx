@@ -646,7 +646,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
             }`}
           >
             <div className="min-h-0 overflow-hidden px-[10px] pb-[32px]">
-              <h2 className="w-3/5 font-display font-black text-foreground text-[36px] leading-[38px] tracking-[-1px]">
+              <h2 className="w-full sm:w-3/5 font-display font-black text-foreground text-[36px] leading-[38px] tracking-[-1px]">
                 Welcome to the indispensable world clock.
               </h2>
             </div>

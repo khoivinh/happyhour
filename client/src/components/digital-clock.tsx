@@ -36,6 +36,9 @@ function EllipsisCircleIcon({ className }: { className?: string }) {
 interface DigitalClockProps {
   time: Date;
   cityName: string;
+  /** Region-free city name (e.g. "New York City", not "New York City, NY"). Used in the
+   *  tile menu and remove dialog where the qualified `cityName` reads as extra list items. */
+  cityShortName?: string;
   timezone: string;
   isHero?: boolean;
   showSeconds?: boolean;
@@ -208,6 +211,7 @@ function getDayIndicator(tileTime: Date, heroDate?: Date): "next" | "prev" | nul
 export function DigitalClock({
   time,
   cityName,
+  cityShortName,
   timezone,
   isHero = false,
   showSeconds = false,
@@ -309,6 +313,8 @@ export function DigitalClock({
   }
 
   const dayIndicator = !isHero ? getDayIndicator(time, heroDate) : null;
+  // Region-free label for menu/dialog copy; falls back to the qualified name if not supplied.
+  const shortName = cityShortName ?? cityName;
 
   if (isHero) {
     return (
@@ -417,14 +423,14 @@ export function DigitalClock({
         stay identical. transition-colors (added below) gives a smooth color
         fade alongside the background-color transition. */}
     <div
-      className={`relative rounded-[15px] px-2.5 pt-[15px] pb-5 border border-transparent
+      className={`relative rounded-[15px] px-2.5 pt-0.5 pb-3 border border-transparent
       ${isRemoving ? "animate-out fade-out-0 zoom-out-95 [animation-duration:800ms] pointer-events-none" : ""}
       ${isDragActive ? "transition-none" : "transition-[background-color,border-color,box-shadow] duration-300 ease-out"}
       ${
         isSelectMode
           ? isSelected
             ? "bg-[var(--tile-sel-bg)] border-[var(--tile-sel-border)] shadow-[inset_0_0_0_1px_var(--tile-sel-border)] cursor-pointer"
-            : "bg-muted cursor-pointer"
+            : "cursor-pointer"
           : isBeingDragged
           ? "bg-[#fdf19d] dark:bg-[#4a4020] border-[#ffedbd] dark:border-[#5c4f2a] shadow-[0_1px_2px_rgba(0,0,0,0.15)]"
           : isDropdownOpen
@@ -440,29 +446,18 @@ export function DigitalClock({
       data-testid={`clock-tile-${selectedZoneKey}`}
     >
       {/* Share select-mode: a full-tile tap layer toggles inclusion and makes the tile's
-          inner controls inert; the check badge sits above it (pointer-events-none so the
-          tap always lands on the toggle). */}
+          inner controls inert. The check indicator itself lives in the ellipsis's flow slot
+          (below) so the tile geometry is identical to normal mode. */}
       {isSelectMode && (
-        <>
-          <button
-            type="button"
-            className="absolute inset-0 z-20 rounded-[15px]"
-            onClick={() => selectedZoneKey && onToggleSelect?.(selectedZoneKey)}
-            data-no-drag
-            aria-pressed={isSelected}
-            aria-label={`${isSelected ? "Remove" : "Add"} ${cityName} ${isSelected ? "from" : "to"} share`}
-            data-testid={`button-select-${selectedZoneKey}`}
-          />
-          <span
-            className={`absolute top-[11px] right-[11px] z-30 flex h-6 w-6 items-center justify-center rounded-full pointer-events-none ${
-              isSelected
-                ? "bg-primary text-primary-foreground"
-                : "border-[1.5px] border-muted-foreground bg-muted dark:bg-[#222222]"
-            }`}
-          >
-            {isSelected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-          </span>
-        </>
+        <button
+          type="button"
+          className="absolute inset-0 z-20 rounded-[15px]"
+          onClick={() => selectedZoneKey && onToggleSelect?.(selectedZoneKey)}
+          data-no-drag
+          aria-pressed={isSelected}
+          aria-label={`${isSelected ? "Remove" : "Add"} ${shortName} ${isSelected ? "from" : "to"} share`}
+          data-testid={`button-select-${selectedZoneKey}`}
+        />
       )}
       {/* Touch-only drag-handle overlay: a 30px-wide full-height invisible
           strip pinned to the tile's left edge. Carries data-drag-handle +
@@ -482,11 +477,17 @@ export function DigitalClock({
       <div className="flex items-start gap-2" ref={isEditing ? editContainerRef : undefined}>
         {/* Visible grip — pure visual affordance. Desktop drag is handled
             by the tile-wrapper mouse sensor; touch drag is handled by the
-            invisible overlay above. */}
-        {isDraggable && (
+            invisible overlay above. In select mode the grip is hidden but its
+            slot is kept (invisible) so the row geometry doesn't shift. */}
+        {(isDraggable || isSelectMode) && (
           <div
-            className="flex-shrink-0 flex items-start justify-center pt-[12px] pr-1 text-muted-foreground/40 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing"
+            className={`flex-shrink-0 flex items-start justify-center pt-[12px] pr-1 text-muted-foreground/40 transition-colors ${
+              isSelectMode
+                ? "invisible"
+                : "hover:text-muted-foreground cursor-grab active:cursor-grabbing"
+            }`}
             title="Drag to reorder"
+            aria-hidden={isSelectMode || undefined}
           >
             <GripVertical className="h-4 w-4" />
           </div>
@@ -629,6 +630,26 @@ export function DigitalClock({
           )}
         </div>
 
+        {/* Select mode: a check indicator occupies the ellipsis's exact slot (same padding/size),
+            so replacing the menu with it never shifts the row. pointer-events-none — the tap lands
+            on the full-tile overlay above. */}
+        {isSelectMode && (
+          <div
+            className="flex-shrink-0 flex items-center justify-center py-[11px] px-[5px] pointer-events-none"
+            aria-hidden="true"
+            data-testid={`select-check-${selectedZoneKey}`}
+          >
+            <span
+              className={`flex h-[17px] w-[17px] items-center justify-center rounded-full ${
+                isSelected
+                  ? "bg-foreground text-background"
+                  : "border-[1.5px] border-foreground/40"
+              }`}
+            >
+              {isSelected && <Check className="h-[11px] w-[11px]" strokeWidth={3} />}
+            </span>
+          </div>
+        )}
         {/* Ellipsis menu — a two-item Share/Delete menu. Hidden in select mode; rendered as
             an invisible placeholder during drag to preserve layout. Share is always present
             (even on the last tile); Delete only when the tile is removable (onRemove set).
@@ -661,18 +682,22 @@ export function DigitalClock({
                 <EllipsisCircleIcon />
               </button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-[236px] p-1.5 rounded-[10px]">
+            <PopoverContent align="end" className="share-tile-menu w-[307px] p-1.5 rounded-[10px]">
               <button
                 type="button"
                 className="flex w-full items-center gap-3 h-11 px-3 rounded-[7px] text-[15px] font-medium text-popover-foreground hover:bg-muted transition-colors"
                 onClick={() => {
+                  // Reset both the menu's open flag AND isDropdownOpen: flipping into select mode
+                  // unmounts this Popover before Radix fires onOpenChange, which would otherwise
+                  // leave isDropdownOpen stuck true and paint a phantom tint after Cancel.
                   setIsMenuOpen(false);
+                  setIsDropdownOpen(false);
                   if (selectedZoneKey) onShare(selectedZoneKey);
                 }}
                 data-testid={`menu-share-${selectedZoneKey}`}
               >
                 <Share className="h-[18px] w-[18px] shrink-0" />
-                <span className="truncate">Share {cityName}</span>
+                <span className="truncate">Share {shortName}</span>
               </button>
               {onRemove && (
                 <>
@@ -687,7 +712,7 @@ export function DigitalClock({
                     data-testid={`menu-delete-${selectedZoneKey}`}
                   >
                     <Trash2 className="h-[18px] w-[18px] shrink-0" />
-                    <span className="truncate">Delete {cityName}</span>
+                    <span className="truncate">Delete {shortName}</span>
                   </button>
                 </>
               )}
@@ -701,7 +726,7 @@ export function DigitalClock({
         <DialogHeader>
           <DialogTitle>Happyhour</DialogTitle>
           <DialogDescription>
-            Remove {cityName}?
+            Remove {shortName}?
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

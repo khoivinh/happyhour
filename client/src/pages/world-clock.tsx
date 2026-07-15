@@ -83,6 +83,9 @@ export default function WorldClock() {
   // Owned here rather than in TimeZoneConverter (where geolocation is resolved) only because
   // SiteFooter — which shows the "allow location" notice — is a sibling, not a descendant.
   const [geoDenied, setGeoDenied] = useState(false);
+  // Mirror of the converter's share select-mode, reported up so the drawer toggle grays out
+  // (and goes inert) while the user is picking cities to share.
+  const [shareActive, setShareActive] = useState(false);
   // Incoming shared link: valid city keys (+ optional frozen instant) parsed from ?z=/&t=,
   // held for the preview/confirm dialog. Null when there's nothing to offer.
   const [shareImport, setShareImport] = useState<{ keys: string[]; t: number | null } | null>(null);
@@ -259,8 +262,13 @@ export default function WorldClock() {
         <div className="mx-auto max-w-4xl relative h-full">
           <button
             onClick={handleToggleSidebar}
+            disabled={shareActive}
             style={{ top: `${TOGGLE_TOP}px` }}
-            className="absolute right-[10px] pointer-events-auto text-[#6B7280] hover:text-[#374151] transition-colors"
+            className={`absolute right-[10px] transition-colors ${
+              shareActive
+                ? "text-[#C4C7CC] pointer-events-none"
+                : "pointer-events-auto text-[#6B7280] hover:text-[#374151]"
+            }`}
             aria-label={sidebarOpen ? "Close menu" : "Open menu"}
             aria-expanded={sidebarOpen}
             aria-controls="app-sidebar"
@@ -311,6 +319,7 @@ export default function WorldClock() {
             selectedZones={selectedZones}
             onZonesChange={setSelectedZones}
             onGeoDeniedChange={setGeoDenied}
+            onShareModeChange={setShareActive}
           />
         </div>
       </div>

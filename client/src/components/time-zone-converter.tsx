@@ -94,6 +94,9 @@ interface TimeZoneConverterProps {
   /** Geolocation is resolved here, but the notice is shown in SiteFooter — a sibling of this
    *  component, not a descendant — so the flag is reported upward rather than held locally. */
   onGeoDeniedChange?: (denied: boolean) => void;
+  /** Share select-mode lives here, but the drawer toggle (which grays out during it) lives in
+   *  the page above — so the active flag is reported upward, mirroring onGeoDeniedChange. */
+  onShareModeChange?: (active: boolean) => void;
 }
 
 interface SortableClockItemProps {
@@ -172,6 +175,7 @@ function SortableClockItem({
       <DigitalClock
         time={city ? getTimeInCityZone(baseTime, city.offset) : baseTime}
         cityName={city ? formatCityDisplay(city) : zoneKey}
+        cityShortName={city ? city.name : zoneKey}
         timezone={city?.gmtLabel || ""}
         isSelectable
         selectedZoneKey={zoneKey}
@@ -268,7 +272,7 @@ export function initZonesFromStorage(): string[] {
   return DEFAULT_ZONES;
 }
 
-export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, selectedZones, onZonesChange, onGeoDeniedChange }: TimeZoneConverterProps) {
+export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, selectedZones, onZonesChange, onGeoDeniedChange, onShareModeChange }: TimeZoneConverterProps) {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [heroZone, setHeroZone] = useState<string>("london_GB");
   const [newlyAddedZone, setNewlyAddedZone] = useState<string | null>(null);
@@ -350,12 +354,29 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     setIncludeLocal(false);
   }, []);
 
+  // Report select-mode up to the page so it can gray out the drawer toggle (a sibling above us).
+  useEffect(() => {
+    onShareModeChange?.(shareMode);
+  }, [shareMode, onShareModeChange]);
+
+  // Esc exits select mode (matches the bottom bar's Cancel).
+  useEffect(() => {
+    if (!shareMode) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") cancelShareMode();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [shareMode, cancelShareMode]);
+
   // Reserve space below everything (incl. the footer, which is a sibling outside this component)
   // while the fixed selection bar is up, so scrolling to the bottom clears the bar.
   useEffect(() => {
     if (!shareMode) return;
     const prev = document.body.style.paddingBottom;
-    document.body.style.paddingBottom = "104px";
+    // The bar stacks into two rows below the sm breakpoint, so it's taller on mobile.
+    const isDesktop = window.matchMedia("(min-width: 640px)").matches;
+    document.body.style.paddingBottom = isDesktop ? "104px" : "132px";
     return () => {
       document.body.style.paddingBottom = prev;
     };
@@ -653,7 +674,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
       <div>
         <section className="sticky top-0 z-40 bg-background border-b border-border pb-16">
           <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            {heroCity ? formatCityDisplay(heroCity) : heroZone}
+            {heroCity ? heroCity.name : heroZone}
           </p>
           <p className="mt-1 font-display text-6xl font-black tracking-tight text-foreground md:text-8xl">
             --:--:--
@@ -703,7 +724,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
       <section className="hero-sticky sticky top-0 z-40 bg-background border-b border-border">
         <DigitalClock
           time={heroTime}
-          cityName={heroCity ? formatCityDisplay(heroCity) : heroZone}
+          cityName={heroCity ? heroCity.name : heroZone}
           timezone={heroCity?.gmtLabel || ""}
           isHero
           showSeconds={!isCustomMode}
@@ -734,12 +755,13 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
             </div>
           </div>
         )}
-        <div className={`mb-[25px] sm:mb-8 relative ${shareMode ? "hidden" : ""}`} ref={addZoneRef}>
+        <div className="mb-[25px] sm:mb-8 relative" ref={addZoneRef}>
           <div className="flex items-center gap-[5px] px-[10px] pb-[20px]">
             <button
-              className="flex items-center gap-1 text-sm font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors focus:outline-none disabled:opacity-50"
-              disabled={!canAddMoreZones}
+              className="flex items-center gap-1 text-sm font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors focus:outline-none disabled:opacity-40 disabled:hover:text-muted-foreground"
+              disabled={!canAddMoreZones || shareMode}
               onClick={() => {
+                if (shareMode) return;
                 setAddZoneOpen(!addZoneOpen);
                 if (addZoneOpen) setAddZoneSearchQuery("");
               }}

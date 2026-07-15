@@ -20,7 +20,14 @@ export function SiteFooter({ geoDenied = false }: SiteFooterProps = {}) {
             className="mb-[10px] text-[12px] leading-[22px] tracking-[-0.43px] text-muted-foreground"
             data-testid="text-geo-denied-hint"
           >
-            Allow location for a closer match.
+            Allow Happyhour to{" "}
+            <Link
+              href="/support"
+              className="underline hover:text-foreground transition-colors"
+            >
+              access your location
+            </Link>{" "}
+            for more precise local time and weather.
           </p>
         )}
         <p className="text-[12px] leading-[22px] tracking-[-0.43px] text-foreground capitalize">

@@ -184,6 +184,9 @@ function SortableClockItem({
 
 const MAX_CLOCKS = 16;
 const STORAGE_KEY = "world-happyhour-zones";
+// One-time onboarding headline. Absent flag + a returning user's saved zones both
+// count as "already onboarded", so only a genuinely new visitor sees the tagline.
+const ONBOARDED_KEY = "world-happyhour-onboarded";
 
 function detectLocalCity(): string {
   try {
@@ -254,6 +257,19 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   const [heroZone, setHeroZone] = useState<string>("london_GB");
   const [newlyAddedZone, setNewlyAddedZone] = useState<string | null>(null);
   const [highlightedZone, setHighlightedZone] = useState<string | null>(null);
+  // Onboarding tagline. `onboarded` is the source of truth (drives mount);
+  // `taglineHiding` is the transient fade+collapse animation state.
+  const [onboarded, setOnboarded] = useState<boolean>(() => {
+    try {
+      return (
+        localStorage.getItem(ONBOARDED_KEY) === "1" ||
+        localStorage.getItem(STORAGE_KEY) !== null
+      );
+    } catch {
+      return true; // storage blocked → don't nag; treat as onboarded
+    }
+  });
+  const [taglineHiding, setTaglineHiding] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const preSortOrderRef = useRef<string[] | null>(null);
 
@@ -420,10 +436,26 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     setNewlyAddedZone(zoneKey);
     track("city_added", { city_key: zoneKey });
 
+    // First-ever add dismisses the onboarding tagline, once and for all.
+    if (!onboarded) {
+      try { localStorage.setItem(ONBOARDED_KEY, "1"); } catch { /* storage blocked */ }
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      // Reduced motion skips the transition entirely, so onTransitionEnd never
+      // fires — cut straight to unmount instead of animating.
+      if (reduce) setOnboarded(true);
+      else setTaglineHiding(true);
+    }
+
     setTimeout(() => {
       setNewlyAddedZone(null);
     }, 1500);
-  }, [selectedZones, onZonesChange, sortEastToWest, onSortEastToWestChange]);
+  }, [selectedZones, onZonesChange, sortEastToWest, onSortEastToWestChange, onboarded]);
+
+  // Unmount the tagline only after the height collapse finishes (the opacity
+  // fade transitionend fires first and must be ignored).
+  const handleTaglineCollapsed = useCallback((e: { propertyName: string }) => {
+    if (e.propertyName === "grid-template-rows") setOnboarded(true);
+  }, []);
 
   const handleRemoveClock = useCallback((zoneKey: string) => {
     // Last-tile guard: never allow the grid to go empty.
@@ -602,6 +634,24 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
       </section>
 
       <section className="pt-[25px] sm:pt-6">
+        {!onboarded && (
+          // Grid whose single row animates 1fr→0fr; the overflow-hidden child
+          // collapses to zero height and the button + tile grid below slide up
+          // in normal flow. Opacity fades first (short), then the row collapses
+          // (longer, delayed) — "quickly fade, then elegantly animate up".
+          <div
+            onTransitionEnd={handleTaglineCollapsed}
+            className={`grid overflow-hidden ease-out transition-[opacity,grid-template-rows] [transition-duration:180ms,360ms] [transition-delay:0ms,150ms] motion-reduce:transition-none ${
+              taglineHiding ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+            }`}
+          >
+            <div className="min-h-0 overflow-hidden px-[10px] pb-[32px]">
+              <h2 className="w-3/5 font-display font-black text-foreground text-[36px] leading-[38px] tracking-[-1px]">
+                Welcome to the indispensable world clock.
+              </h2>
+            </div>
+          </div>
+        )}
         <div className="mb-[25px] sm:mb-8 relative" ref={addZoneRef}>
           <div className="flex items-center gap-[5px] px-[10px] pb-[20px]">
             <button

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { GripVertical, Check, ChevronsUpDown } from "lucide-react";
+import { GripVertical, Check, ChevronsUpDown, Share, Trash2 } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -49,6 +49,14 @@ interface DigitalClockProps {
   zoneKey?: string;
   onTimeUpdate?: (zoneKey: string, hours: number, minutes: number) => void;
   onRemove?: () => void;
+  /** Enters the share flow for this tile's city. Present on grid tiles regardless of
+   *  tile count (unlike onRemove), so Share stays reachable even on the last tile. */
+  onShare?: (zoneKey: string) => void;
+  /** Share select-mode: when true the whole tile becomes a selection toggle and its
+   *  inner controls (time edit, city picker, reset, ellipsis) go inert. */
+  isSelectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (zoneKey: string) => void;
   isDragActive?: boolean;
   dragHandleListeners?: Record<string, unknown>;
   heroDate?: Date;
@@ -213,6 +221,10 @@ export function DigitalClock({
   zoneKey,
   onTimeUpdate,
   onRemove,
+  onShare,
+  isSelectMode = false,
+  isSelected = false,
+  onToggleSelect,
   isDragActive = false,
   dragHandleListeners,
   heroDate,
@@ -241,6 +253,7 @@ export function DigitalClock({
   }
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editTime, setEditTime] = useState("");
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
@@ -408,7 +421,11 @@ export function DigitalClock({
       ${isRemoving ? "animate-out fade-out-0 zoom-out-95 [animation-duration:800ms] pointer-events-none" : ""}
       ${isDragActive ? "transition-none" : "transition-[background-color,border-color,box-shadow] duration-300 ease-out"}
       ${
-        isBeingDragged
+        isSelectMode
+          ? isSelected
+            ? "bg-[var(--tile-sel-bg)] border-[var(--tile-sel-border)] shadow-[inset_0_0_0_1px_var(--tile-sel-border)] cursor-pointer"
+            : "bg-muted cursor-pointer"
+          : isBeingDragged
           ? "bg-[#fdf19d] dark:bg-[#4a4020] border-[#ffedbd] dark:border-[#5c4f2a] shadow-[0_1px_2px_rgba(0,0,0,0.15)]"
           : isDropdownOpen
             ? "bg-[#fdf7ca] dark:bg-[#3d3520] border-[#ffedbd] dark:border-[#5c4f2a]"
@@ -422,6 +439,31 @@ export function DigitalClock({
       }`}
       data-testid={`clock-tile-${selectedZoneKey}`}
     >
+      {/* Share select-mode: a full-tile tap layer toggles inclusion and makes the tile's
+          inner controls inert; the check badge sits above it (pointer-events-none so the
+          tap always lands on the toggle). */}
+      {isSelectMode && (
+        <>
+          <button
+            type="button"
+            className="absolute inset-0 z-20 rounded-[15px]"
+            onClick={() => selectedZoneKey && onToggleSelect?.(selectedZoneKey)}
+            data-no-drag
+            aria-pressed={isSelected}
+            aria-label={`${isSelected ? "Remove" : "Add"} ${cityName} ${isSelected ? "from" : "to"} share`}
+            data-testid={`button-select-${selectedZoneKey}`}
+          />
+          <span
+            className={`absolute top-[11px] right-[11px] z-30 flex h-6 w-6 items-center justify-center rounded-full pointer-events-none ${
+              isSelected
+                ? "bg-primary text-primary-foreground"
+                : "border-[1.5px] border-muted-foreground bg-muted dark:bg-[#222222]"
+            }`}
+          >
+            {isSelected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+          </span>
+        </>
+      )}
       {/* Touch-only drag-handle overlay: a 30px-wide full-height invisible
           strip pinned to the tile's left edge. Carries data-drag-handle +
           dragHandleListeners so HandleTouchSensor activates from anywhere
@@ -587,20 +629,70 @@ export function DigitalClock({
           )}
         </div>
 
-        {/* Ellipsis menu button — rendered invisible during drag to preserve layout */}
-        {(onRemove || isBeingDragged) && (
+        {/* Ellipsis menu — a two-item Share/Delete menu. Hidden in select mode; rendered as
+            an invisible placeholder during drag to preserve layout. Share is always present
+            (even on the last tile); Delete only when the tile is removable (onRemove set).
+            Opening the menu drives isDropdownOpen so the tile shows its active tint. */}
+        {!isSelectMode && isBeingDragged && (
           <button
-            className={`flex-shrink-0 flex items-center justify-center py-[11px] px-[5px] rounded-md text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation ${isBeingDragged ? "invisible" : ""}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRemoveWithConfirm();
-            }}
-            title="Options"
-            data-no-drag
-            data-testid={`button-remove-${selectedZoneKey}`}
+            className="flex-shrink-0 flex items-center justify-center py-[11px] px-[5px] rounded-md text-muted-foreground/50 invisible"
+            tabIndex={-1}
+            aria-hidden="true"
           >
             <EllipsisCircleIcon />
           </button>
+        )}
+        {!isSelectMode && !isBeingDragged && onShare && (
+          <Popover
+            open={isMenuOpen}
+            onOpenChange={(o) => {
+              setIsMenuOpen(o);
+              setIsDropdownOpen(o);
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                className="flex-shrink-0 flex items-center justify-center py-[11px] px-[5px] rounded-md text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation"
+                onClick={(e) => e.stopPropagation()}
+                title="Options"
+                data-no-drag
+                data-testid={`button-tile-menu-${selectedZoneKey}`}
+              >
+                <EllipsisCircleIcon />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[236px] p-1.5 rounded-[10px]">
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 h-11 px-3 rounded-[7px] text-[15px] font-medium text-popover-foreground hover:bg-muted transition-colors"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  if (selectedZoneKey) onShare(selectedZoneKey);
+                }}
+                data-testid={`menu-share-${selectedZoneKey}`}
+              >
+                <Share className="h-[18px] w-[18px] shrink-0" />
+                <span className="truncate">Share {cityName}</span>
+              </button>
+              {onRemove && (
+                <>
+                  <div className="my-1 mx-1 h-px bg-border/70" />
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 h-11 px-3 rounded-[7px] text-[15px] font-medium text-destructive hover:bg-muted transition-colors"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      handleRemoveWithConfirm();
+                    }}
+                    data-testid={`menu-delete-${selectedZoneKey}`}
+                  >
+                    <Trash2 className="h-[18px] w-[18px] shrink-0" />
+                    <span className="truncate">Delete {cityName}</span>
+                  </button>
+                </>
+              )}
+            </PopoverContent>
+          </Popover>
         )}
       </div>
     </div>

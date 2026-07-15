@@ -27,6 +27,8 @@ import { getAllCities, getCityByKey, searchCities, getTimeInCityZone, formatCity
 import { cacheTileMetadata, getCityOrCachedTile } from "@/lib/tile-cache";
 import { resolveLocalCity } from "@/lib/closest-city";
 import { track } from "@/lib/analytics";
+import { toast } from "@/hooks/use-toast";
+import { ShareSelectionBar } from "@/components/share-selection-bar";
 
 // Track recent touch events so we can suppress synthetic mouse events on mobile.
 // Browsers fire mousedown ~0-100ms after touchstart; if MouseSensor activates on
@@ -105,6 +107,10 @@ interface SortableClockItemProps {
   onZoneChange: (index: number, zoneKey: string) => void;
   onTimeUpdate: (zoneKey: string, hours: number, minutes: number) => void;
   onRemove?: (zoneKey: string) => void;
+  onShare: (zoneKey: string) => void;
+  isSelectMode: boolean;
+  isSelected: boolean;
+  onToggleSelect: (zoneKey: string) => void;
   allZones: string[];
   isDragActive: boolean;
   isCustomMode: boolean;
@@ -124,6 +130,10 @@ function SortableClockItem({
   onZoneChange,
   onTimeUpdate,
   onRemove,
+  onShare,
+  isSelectMode,
+  isSelected,
+  onToggleSelect,
   allZones,
   isDragActive,
   isCustomMode,
@@ -148,12 +158,14 @@ function SortableClockItem({
 
   const city = getCityOrCachedTile(zoneKey);
 
+  // In select mode dragging is off, so the wrapper doesn't carry the drag attributes/listeners.
+  const dragProps = isSelectMode ? {} : { ...attributes, ...listeners };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
+      {...dragProps}
       className="relative"
       data-testid={`draggable-zone-${zoneKey}`}
     >
@@ -166,11 +178,15 @@ function SortableClockItem({
         onZoneChange={(newZone) => onZoneChange(index, newZone)}
         isNew={isNew}
         isHighlighted={isHighlighted}
-        isDraggable
+        isDraggable={!isSelectMode}
         isBeingDragged={isDragging}
         zoneKey={zoneKey}
         onTimeUpdate={onTimeUpdate}
         onRemove={onRemove ? () => onRemove(zoneKey) : undefined}
+        onShare={onShare}
+        isSelectMode={isSelectMode}
+        isSelected={isSelected}
+        onToggleSelect={onToggleSelect}
         isDragActive={isDragActive}
         dragHandleListeners={listeners}
         heroDate={heroDate}
@@ -306,6 +322,72 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
 
   const [citiesLoaded, setCitiesLoaded] = useState(areCitiesLoaded());
   const [fullLoadFailed, setFullLoadFailed] = useState(didFullCitiesFail());
+
+  // ---- Share flow: select-mode state ----
+  const [shareMode, setShareMode] = useState(false);
+  const [shareSelection, setShareSelection] = useState<Set<string>>(() => new Set());
+  const [includeLocal, setIncludeLocal] = useState(false);
+
+  const enterShareMode = useCallback((seedKey: string) => {
+    setShareSelection(new Set([seedKey]));
+    setIncludeLocal(false);
+    setShareMode(true);
+    track("share_started");
+  }, []);
+
+  const toggleShareSelection = useCallback((zoneKey: string) => {
+    setShareSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(zoneKey)) next.delete(zoneKey);
+      else next.add(zoneKey);
+      return next;
+    });
+  }, []);
+
+  const cancelShareMode = useCallback(() => {
+    setShareMode(false);
+    setShareSelection(new Set());
+    setIncludeLocal(false);
+  }, []);
+
+  // Reserve space below everything (incl. the footer, which is a sibling outside this component)
+  // while the fixed selection bar is up, so scrolling to the bottom clears the bar.
+  useEffect(() => {
+    if (!shareMode) return;
+    const prev = document.body.style.paddingBottom;
+    document.body.style.paddingBottom = "104px";
+    return () => {
+      document.body.style.paddingBottom = prev;
+    };
+  }, [shareMode]);
+
+  // Effective share set: selected grid tiles in grid order, optionally prefixed with the
+  // local (hero) city. Deduped so a hero that's also a selected tile counts once.
+  const shareKeys = useMemo(() => {
+    const selected = selectedZones.filter((z) => shareSelection.has(z));
+    return includeLocal ? [heroZone, ...selected.filter((z) => z !== heroZone)] : selected;
+  }, [selectedZones, shareSelection, includeLocal, heroZone]);
+
+  const commitShare = useCallback(async () => {
+    if (shareKeys.length === 0) return;
+    const params = new URLSearchParams();
+    params.set("z", shareKeys.join(","));
+    // Freeze the moment only when a custom time is active; a real-time share stays live.
+    if (isCustomMode && selectedTime) params.set("t", String(selectedTime.getTime()));
+    const url = `${window.location.origin}/?${params.toString()}`;
+    track("share_committed", { count: shareKeys.length });
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ url });
+      } else if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        toast({ title: "Link copied", description: "Share it to add these clocks." });
+      }
+    } catch {
+      /* native share sheet cancelled, or clipboard blocked — nothing to do */
+    }
+    cancelShareMode();
+  }, [shareKeys, isCustomMode, selectedTime, cancelShareMode]);
 
   // Three-tier load: top (fast, inline bundle) → cache fallback → full (lazy).
   useEffect(() => {
@@ -652,7 +734,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
             </div>
           </div>
         )}
-        <div className="mb-[25px] sm:mb-8 relative" ref={addZoneRef}>
+        <div className={`mb-[25px] sm:mb-8 relative ${shareMode ? "hidden" : ""}`} ref={addZoneRef}>
           <div className="flex items-center gap-[5px] px-[10px] pb-[20px]">
             <button
               className="flex items-center gap-1 text-sm font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground transition-colors focus:outline-none disabled:opacity-50"
@@ -734,7 +816,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
         </div>
 
         <DndContext
-          sensors={sensors}
+          sensors={shareMode ? [] : sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
@@ -758,6 +840,10 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
                   onZoneChange={handleZoneChange}
                   onTimeUpdate={onTimeUpdate}
                   onRemove={selectedZones.length <= 1 ? undefined : handleRemoveClock}
+                  onShare={enterShareMode}
+                  isSelectMode={shareMode}
+                  isSelected={shareSelection.has(zoneKey)}
+                  onToggleSelect={toggleShareSelection}
                   allZones={selectedZones}
                   isDragActive={activeId !== null}
                   isCustomMode={isCustomMode}
@@ -788,7 +874,18 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
             ) : null}
           </DragOverlay>
         </DndContext>
+
       </section>
+
+      {shareMode && (
+        <ShareSelectionBar
+          count={shareKeys.length}
+          includeLocal={includeLocal}
+          onToggleIncludeLocal={() => setIncludeLocal((v) => !v)}
+          onCancel={cancelShareMode}
+          onShare={commitShare}
+        />
+      )}
     </div>
   );
 }

@@ -62,6 +62,12 @@
   --font-serif: 'Source Serif 4', serif;
   --font-mono: 'Geist Mono', monospace;
   --font-display: 'Zalando Sans', 'Inter', sans-serif;
+
+  /* Share select-mode: the "included" tile fill/border. Reuses the dropdown-open cream in
+     light/dark; Happy gets a deepened gold so it separates from the yellow page + pale
+     unselected tiles (light's #fdf7ca would vanish there). See share flow design gate. */
+  --tile-sel-bg: #fdf7ca;
+  --tile-sel-border: #ffedbd;
 }
 
 .happy {
@@ -104,6 +110,9 @@
   --sidebar-accent-foreground: 51 100% 90%;
   --sidebar-border: 0 0% 30%;
   --sidebar-ring: 51 100% 50%;
+
+  --tile-sel-bg: #fff0a8;
+  --tile-sel-border: #eab700;
 }
 
 .dark {
@@ -143,6 +152,9 @@
   --sidebar-accent-foreground: 213 97% 87%;
   --sidebar-border: 0 0% 25%;
   --sidebar-ring: 217 91% 60%;
+
+  --tile-sel-bg: #3d3520;
+  --tile-sel-border: #5c4f2a;
 }
 
 @layer base {

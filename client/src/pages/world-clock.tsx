@@ -1,7 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import { TimeZoneConverter } from "@/components/time-zone-converter";
 import { Sidebar, DrawerToggleIcon } from "@/components/sidebar";
-import { getCityByKey } from "@/lib/city-lookup";
+import { getCityByKey, loadTopCities } from "@/lib/city-lookup";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useCloudSync } from "@/hooks/use-cloud-sync";
 import { useTheme } from "@/lib/theme-provider";
 import { initZonesFromStorage } from "@/components/time-zone-converter";
@@ -34,6 +42,30 @@ const SORT_ETW_KEY = "world-happyhour-sort-etw";
 const ZONES_KEY = "world-happyhour-zones";
 const SHOW_REL_TIME_KEY = "world-happyhour-rel-time";
 
+/** "Tokyo, Paris, and London" for ≤3; "Tokyo, Paris, and 4 more" beyond. Uses bare city names
+ *  (not the province-qualified display) so commas within names don't fracture the sentence. */
+function formatSharedCityList(keys: string[]): string {
+  const names = keys
+    .map((k) => {
+      const c = getCityByKey(k);
+      return c ? c.name : null;
+    })
+    .filter((n): n is string => n !== null);
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  if (names.length === 3) return `${names[0]}, ${names[1]}, and ${names[2]}`;
+  return `${names[0]}, ${names[1]}, and ${names.length - 2} more`;
+}
+
+/** A frozen shared instant rendered in the recipient's local time, e.g. "3:00 PM · Jul 15". */
+function formatFrozenTime(t: number, use24h: boolean): string {
+  const d = new Date(t);
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: !use24h });
+  const date = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${time} · ${date}`;
+}
+
 export default function WorldClock() {
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [selectedTime, setSelectedTime] = useState<Date | null>(null);
@@ -51,6 +83,9 @@ export default function WorldClock() {
   // Owned here rather than in TimeZoneConverter (where geolocation is resolved) only because
   // SiteFooter — which shows the "allow location" notice — is a sibling, not a descendant.
   const [geoDenied, setGeoDenied] = useState(false);
+  // Incoming shared link: valid city keys (+ optional frozen instant) parsed from ?z=/&t=,
+  // held for the preview/confirm dialog. Null when there's nothing to offer.
+  const [shareImport, setShareImport] = useState<{ keys: string[]; t: number | null } | null>(null);
   const { theme, setTheme } = useTheme();
   // Scroll-driven hero shrink. JS writes one number and nothing else: every size, and the
   // breakpoint itself, lives in index.css (.hero-time / .hero-clock / .hero-sticky). Writing a
@@ -117,6 +152,59 @@ export default function WorldClock() {
     setIsCustomMode(false);
     setSelectedTime(null);
     track("custom_time_reset");
+  }
+
+  // Parse an incoming shared link once on load: read ?z= / ?t=, strip the params immediately so
+  // a refresh never re-prompts, then resolve the keys AFTER the city lookup is loaded (it loads
+  // async, and getCityByKey returns undefined before then — resolving too early would silently
+  // drop every shared city). Unknown keys are dropped; a valid set feeds the preview dialog.
+  useEffect(() => {
+    let rawKeys: string | null = null;
+    let rawT: string | null = null;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      rawKeys = params.get("z");
+      rawT = params.get("t");
+    } catch {
+      return;
+    }
+    if (!rawKeys) return;
+    try {
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch {
+      /* history blocked — the dialog still works, refresh may re-prompt */
+    }
+    const candidates = rawKeys.split(",").map((k) => k.trim()).filter(Boolean);
+    if (candidates.length === 0) return;
+    const tNum = rawT ? Number(rawT) : NaN;
+    const t = Number.isFinite(tNum) ? tNum : null;
+
+    let cancelled = false;
+    loadTopCities().then(() => {
+      if (cancelled) return;
+      const keys = candidates.filter((k) => getCityByKey(k));
+      if (keys.length === 0) return;
+      setShareImport({ keys, t });
+      track("share_link_opened", { count: keys.length });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleAddShared() {
+    if (!shareImport) return;
+    setSelectedZones((prev) => {
+      const merged = [...prev];
+      for (const k of shareImport.keys) if (!merged.includes(k)) merged.push(k);
+      return merged.slice(0, 16); // same 16-zone cap as cloud sync
+    });
+    if (shareImport.t != null) {
+      setSelectedTime(new Date(shareImport.t));
+      setIsCustomMode(true);
+    }
+    track("share_link_added", { count: shareImport.keys.length });
+    setShareImport(null);
   }
 
   const handleCloseSidebar = useCallback(() => setSidebarOpen(false), []);
@@ -228,6 +316,43 @@ export default function WorldClock() {
       </div>
 
       <SiteFooter geoDenied={geoDenied} />
+
+      <Dialog open={!!shareImport} onOpenChange={(o) => { if (!o) setShareImport(null); }}>
+        <DialogContent className="bg-card text-card-foreground sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="font-display text-[19px] font-black tracking-[-0.01em]">
+              Add shared clocks?
+            </DialogTitle>
+            <DialogDescription>
+              {shareImport && (
+                <>
+                  Add {formatSharedCityList(shareImport.keys)} to your clocks
+                  {shareImport.t != null && <> at {formatFrozenTime(shareImport.t, use24Hour)}</>}?
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setShareImport(null)}
+              className="inline-flex items-center justify-center rounded-md border border-input bg-transparent px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+              data-testid="button-share-import-cancel"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleAddShared}
+              autoFocus
+              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              data-testid="button-share-import-add"
+            >
+              Add
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

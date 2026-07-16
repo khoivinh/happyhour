@@ -97,6 +97,10 @@ interface TimeZoneConverterProps {
   /** Share select-mode lives here, but the drawer toggle (which grays out during it) lives in
    *  the page above — so the active flag is reported upward, mirroring onGeoDeniedChange. */
   onShareModeChange?: (active: boolean) => void;
+  /** Cities to flash on arrival, driven from outside — the Sharing View hands over several at
+   *  once when a shared link is accepted. The local highlight (adding one city by hand) stays
+   *  separate: it's a different event that happens to reuse the same animation. */
+  highlightedZones?: string[];
 }
 
 interface SortableClockItemProps {
@@ -169,7 +173,9 @@ function SortableClockItem({
       ref={setNodeRef}
       style={style}
       {...dragProps}
-      className="relative"
+      // my-[3px] is breathing room between stacked tiles, not part of the tile: it rides the grid
+      // wrapper so the tile's own box (and the grip alignment measured against it) is untouched.
+      className="relative my-[3px]"
       data-testid={`draggable-zone-${zoneKey}`}
     >
       <DigitalClock
@@ -202,7 +208,9 @@ function SortableClockItem({
   );
 }
 
-const MAX_CLOCKS = 16;
+/** Exported because the incoming-share merge in world-clock.tsx caps against the same
+ *  limit — it previously hardcoded a bare `16`, which could drift from this one. */
+export const MAX_CLOCKS = 16;
 const STORAGE_KEY = "world-happyhour-zones";
 // One-time onboarding headline. Absent flag + a returning user's saved zones both
 // count as "already onboarded", so only a genuinely new visitor sees the tagline.
@@ -272,7 +280,7 @@ export function initZonesFromStorage(): string[] {
   return DEFAULT_ZONES;
 }
 
-export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, selectedZones, onZonesChange, onGeoDeniedChange, onShareModeChange }: TimeZoneConverterProps) {
+export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, selectedZones, onZonesChange, onGeoDeniedChange, onShareModeChange, highlightedZones }: TimeZoneConverterProps) {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [heroZone, setHeroZone] = useState<string>("london_GB");
   const [newlyAddedZone, setNewlyAddedZone] = useState<string | null>(null);
@@ -331,6 +339,11 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   const [shareMode, setShareMode] = useState(false);
   const [shareSelection, setShareSelection] = useState<Set<string>>(() => new Set());
   const [includeLocal, setIncludeLocal] = useState(false);
+  // Read once, not per render: a browser doesn't grow a share sheet mid-session, and the bar's
+  // shape shouldn't depend on when React happens to re-render.
+  const [canNativeShare] = useState(
+    () => typeof navigator !== "undefined" && typeof navigator.share === "function"
+  );
 
   const enterShareMode = useCallback((seedKey: string) => {
     setShareSelection(new Set([seedKey]));
@@ -369,18 +382,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [shareMode, cancelShareMode]);
 
-  // Reserve space below everything (incl. the footer, which is a sibling outside this component)
-  // while the fixed selection bar is up, so scrolling to the bottom clears the bar.
-  useEffect(() => {
-    if (!shareMode) return;
-    const prev = document.body.style.paddingBottom;
-    // The bar stacks into two rows below the sm breakpoint, so it's taller on mobile.
-    const isDesktop = window.matchMedia("(min-width: 640px)").matches;
-    document.body.style.paddingBottom = isDesktop ? "104px" : "132px";
-    return () => {
-      document.body.style.paddingBottom = prev;
-    };
-  }, [shareMode]);
+  // (Footer clearance while the bar is up is reserved by CommitBar itself, on mount.)
 
   // Effective share set: selected grid tiles in grid order, optionally prefixed with the
   // local (hero) city. Deduped so a hero that's also a selected tile counts once.
@@ -389,26 +391,44 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     return includeLocal ? [heroZone, ...selected.filter((z) => z !== heroZone)] : selected;
   }, [selectedZones, shareSelection, includeLocal, heroZone]);
 
-  const commitShare = useCallback(async () => {
-    if (shareKeys.length === 0) return;
+  const buildShareUrl = useCallback(() => {
     const params = new URLSearchParams();
     params.set("z", shareKeys.join(","));
     // Freeze the moment only when a custom time is active; a real-time share stays live.
     if (isCustomMode && selectedTime) params.set("t", String(selectedTime.getTime()));
-    const url = `${window.location.origin}/?${params.toString()}`;
-    track("share_committed", { count: shareKeys.length });
+    return `${window.location.origin}/?${params.toString()}`;
+  }, [shareKeys, isCustomMode, selectedTime]);
+
+  /** Hand the link to the OS share sheet. Only reachable where `navigator.share` exists — the bar
+   *  hides Share otherwise rather than quietly turning it into a second Copy Link. */
+  const commitShare = useCallback(async () => {
+    if (shareKeys.length === 0) return;
+    const url = buildShareUrl();
+    // Fires before the sheet resolves: this counts intent, and a cancelled sheet is
+    // indistinguishable from a completed one anyway (the Web Share API doesn't say).
+    track("share_committed", { count: shareKeys.length, method: "native" });
     try {
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ url });
-      } else if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-        toast({ title: "Link copied", description: "Share it to add these clocks." });
-      }
+      await navigator.share!({ url });
     } catch {
-      /* native share sheet cancelled, or clipboard blocked — nothing to do */
+      /* native share sheet cancelled — nothing to do */
     }
     cancelShareMode();
-  }, [shareKeys, isCustomMode, selectedTime, cancelShareMode]);
+  }, [shareKeys, buildShareUrl, cancelShareMode]);
+
+  const copyShareLink = useCallback(async () => {
+    if (shareKeys.length === 0) return;
+    const url = buildShareUrl();
+    track("share_committed", { count: shareKeys.length, method: "copy" });
+    try {
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link copied", description: "Share it to add these clocks." });
+    } catch {
+      /* clipboard blocked (insecure context, or permission denied) — leave select mode intact
+         so the selection isn't silently lost with nothing to show for it. */
+      return;
+    }
+    cancelShareMode();
+  }, [shareKeys, buildShareUrl, cancelShareMode]);
 
   // Three-tier load: top (fast, inline bundle) → cache fallback → full (lazy).
   useEffect(() => {
@@ -858,7 +878,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
                   baseTime={baseTime}
                   heroDate={heroTime}
                   isNew={newlyAddedZone === zoneKey}
-                  isHighlighted={highlightedZone === zoneKey}
+                  isHighlighted={highlightedZone === zoneKey || !!highlightedZones?.includes(zoneKey)}
                   onZoneChange={handleZoneChange}
                   onTimeUpdate={onTimeUpdate}
                   onRemove={selectedZones.length <= 1 ? undefined : handleRemoveClock}
@@ -906,6 +926,8 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
           onToggleIncludeLocal={() => setIncludeLocal((v) => !v)}
           onCancel={cancelShareMode}
           onShare={commitShare}
+          onCopyLink={copyShareLink}
+          canNativeShare={canNativeShare}
         />
       )}
     </div>

@@ -1,18 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { TimeZoneConverter } from "@/components/time-zone-converter";
+import { SharedLinkView } from "@/components/shared-link-view";
 import { Sidebar, DrawerToggleIcon } from "@/components/sidebar";
 import { getCityByKey, loadTopCities } from "@/lib/city-lookup";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useCloudSync } from "@/hooks/use-cloud-sync";
 import { useTheme } from "@/lib/theme-provider";
-import { initZonesFromStorage } from "@/components/time-zone-converter";
+import { initZonesFromStorage, MAX_CLOCKS } from "@/components/time-zone-converter";
 import { LogoBar } from "@/components/logo-bar";
 import { OfflineBanner } from "@/components/offline-banner";
 import { SiteFooter } from "@/components/site-footer";
@@ -86,9 +79,25 @@ export default function WorldClock() {
   // Mirror of the converter's share select-mode, reported up so the drawer toggle grays out
   // (and goes inert) while the user is picking cities to share.
   const [shareActive, setShareActive] = useState(false);
-  // Incoming shared link: valid city keys (+ optional frozen instant) parsed from ?z=/&t=,
-  // held for the preview/confirm dialog. Null when there's nothing to offer.
+  // Incoming shared link: valid city keys (+ optional frozen instant) parsed from ?z=/&t=.
+  // Non-null puts the page into the Sharing View instead of the clock board.
   const [shareImport, setShareImport] = useState<{ keys: string[]; t: number | null } | null>(null);
+  // Cities to flash on arrival, handed to the board when the Sharing View retires. Cleared once
+  // the animation has had time to play; it's a one-shot, not a lasting property of the tiles.
+  const [highlightedZones, setHighlightedZones] = useState<string[]>([]);
+  // A shared link's *keys* resolve asynchronously (they need the city lookup loaded), but whether
+  // the URL carries ?z= at all is knowable synchronously — so the board is held back until we
+  // know. Otherwise the recipient's own clocks mount and paint for a frame before the Sharing View
+  // replaces them, and worse: mounting the board resolves geolocation, so a denied prompt leaves
+  // the footer's "allow location for more precise local time" notice stuck on a surface that shows
+  // no local time at all.
+  const [sharePending, setSharePending] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).has("z");
+    } catch {
+      return false;
+    }
+  });
   const { theme, setTheme } = useTheme();
   // Scroll-driven hero shrink. JS writes one number and nothing else: every size, and the
   // breakpoint itself, lives in index.css (.hero-time / .hero-clock / .hero-sticky). Writing a
@@ -162,6 +171,9 @@ export default function WorldClock() {
   // async, and getCityByKey returns undefined before then — resolving too early would silently
   // drop every shared city). Unknown keys are dropped; a valid set feeds the preview dialog.
   useEffect(() => {
+    // Every exit path must land here, or a link that resolves to nothing would leave the board
+    // held back forever on a blank page.
+    const settled = () => setSharePending(false);
     let rawKeys: string | null = null;
     let rawT: string | null = null;
     try {
@@ -169,16 +181,23 @@ export default function WorldClock() {
       rawKeys = params.get("z");
       rawT = params.get("t");
     } catch {
+      settled();
       return;
     }
-    if (!rawKeys) return;
+    if (!rawKeys) {
+      settled();
+      return;
+    }
     try {
       window.history.replaceState(null, "", window.location.pathname);
     } catch {
-      /* history blocked — the dialog still works, refresh may re-prompt */
+      /* history blocked — the Sharing View still works, refresh may re-prompt */
     }
     const candidates = rawKeys.split(",").map((k) => k.trim()).filter(Boolean);
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) {
+      settled();
+      return;
+    }
     const tNum = rawT ? Number(rawT) : NaN;
     const t = Number.isFinite(tNum) ? tNum : null;
 
@@ -186,29 +205,63 @@ export default function WorldClock() {
     loadTopCities().then(() => {
       if (cancelled) return;
       const keys = candidates.filter((k) => getCityByKey(k));
-      if (keys.length === 0) return;
-      setShareImport({ keys, t });
-      track("share_link_opened", { count: keys.length });
+      if (keys.length > 0) {
+        setShareImport({ keys, t });
+        track("share_link_opened", { count: keys.length });
+      }
+      // Batched with setShareImport above, so the board and the Sharing View never both render.
+      settled();
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  function handleAddShared() {
+  /** Merge the cities the recipient chose in the Sharing View.
+   *
+   *  `chosen` can't exceed the cap — the Sharing View won't let more be selected than the board can
+   *  hold — so the slice here is a guard, not the mechanism. That's the point: the cap is enforced
+   *  where the recipient can still do something about it, rather than silently truncating after
+   *  they've agreed to a list. Highlighting is what tells them which tiles are new.
+   *
+   *  Counts come from `chosen`, not from a state updater: StrictMode double-invokes updaters, so
+   *  counting inside one would double every number. */
+  function handleAddShared(chosen: string[]) {
     if (!shareImport) return;
-    setSelectedZones((prev) => {
-      const merged = [...prev];
-      for (const k of shareImport.keys) if (!merged.includes(k)) merged.push(k);
-      return merged.slice(0, 16); // same 16-zone cap as cloud sync
-    });
+    const merged = [...selectedZones];
+    for (const k of chosen) if (!merged.includes(k)) merged.push(k);
+    const added = chosen.filter((k) => !selectedZones.includes(k));
+
+    setSelectedZones(merged.slice(0, MAX_CLOCKS));
+    setHighlightedZones(added);
     if (shareImport.t != null) {
       setSelectedTime(new Date(shareImport.t));
       setIsCustomMode(true);
     }
-    track("share_link_added", { count: shareImport.keys.length });
+    // `count` stays what the link offered, so share_link_opened → share_link_added still compares;
+    // `added` is what the recipient took, and `capped` records whether the 16-limit was what
+    // stopped them taking the rest (as opposed to simply not wanting them).
+    track("share_link_added", {
+      count: shareImport.keys.length,
+      added: added.length,
+      capped: shareImport.keys.filter((k) => !selectedZones.includes(k)).length > MAX_CLOCKS - selectedZones.length,
+    });
     setShareImport(null);
   }
+
+  function handleDismissShared() {
+    if (shareImport) track("share_link_dismissed", { count: shareImport.keys.length });
+    setShareImport(null);
+  }
+
+  // Retire the arrival highlight once it has had time to play. Not cosmetic housekeeping: the
+  // highlight branch sits above hover in the tile's state chain, so leaving it set would cost
+  // those tiles their hover state for the rest of the session.
+  useEffect(() => {
+    if (highlightedZones.length === 0) return;
+    const id = setTimeout(() => setHighlightedZones([]), 2000); // = the animation's duration
+    return () => clearTimeout(id);
+  }, [highlightedZones]);
 
   const handleCloseSidebar = useCallback(() => setSidebarOpen(false), []);
 
@@ -255,8 +308,12 @@ export default function WorldClock() {
               inside, putting its close icon at column_right − 10px; right-[10px] here is
               that same offset. Do NOT give the button a z-index: the panel (z-70) must cover
               it when open, so the sidebar's own close icon takes over in place. */}
+      {/* The Sharing View has no drawer (Figma 344:3787): its settings act on a board the visitor
+          hasn't accepted yet, and the sidebar's own controls would be editing someone else's
+          clocks. Hidden rather than disabled — there's nothing here it could apply to. */}
       <nav
         aria-label="Main menu"
+        hidden={!!shareImport || sharePending}
         className="fixed inset-x-0 top-0 bottom-0 z-[55] px-6 md:px-12 lg:px-24 pointer-events-none"
       >
         <div className="mx-auto max-w-4xl relative h-full">
@@ -307,61 +364,36 @@ export default function WorldClock() {
           header's own pb-[10px]. */}
       <div className="flex-1 px-6 pt-0 pb-8 md:px-12 lg:px-24">
         <div className="mx-auto max-w-4xl">
-          <TimeZoneConverter
-            isCustomMode={isCustomMode}
-            selectedTime={selectedTime}
-            onTimeUpdate={handleTimeUpdate}
-            onReset={handleReset}
-            use24Hour={use24Hour}
-            sortEastToWest={sortEastToWest}
-            onSortEastToWestChange={setSortEastToWest}
-            showRelativeTime={showRelativeTime}
-            selectedZones={selectedZones}
-            onZonesChange={setSelectedZones}
-            onGeoDeniedChange={setGeoDenied}
-            onShareModeChange={setShareActive}
-          />
+          {shareImport ? (
+            <SharedLinkView
+              keys={shareImport.keys}
+              t={shareImport.t}
+              ownedKeys={selectedZones}
+              use24Hour={use24Hour}
+              onAdd={handleAddShared}
+              onCancel={handleDismissShared}
+            />
+          ) : sharePending ? null : (
+            <TimeZoneConverter
+              isCustomMode={isCustomMode}
+              selectedTime={selectedTime}
+              onTimeUpdate={handleTimeUpdate}
+              onReset={handleReset}
+              use24Hour={use24Hour}
+              sortEastToWest={sortEastToWest}
+              onSortEastToWestChange={setSortEastToWest}
+              showRelativeTime={showRelativeTime}
+              selectedZones={selectedZones}
+              onZonesChange={setSelectedZones}
+              onGeoDeniedChange={setGeoDenied}
+              onShareModeChange={setShareActive}
+              highlightedZones={highlightedZones}
+            />
+          )}
         </div>
       </div>
 
       <SiteFooter geoDenied={geoDenied} />
-
-      <Dialog open={!!shareImport} onOpenChange={(o) => { if (!o) setShareImport(null); }}>
-        <DialogContent className="bg-card text-card-foreground sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle className="font-display text-[19px] font-black tracking-[-0.01em]">
-              Add shared clocks?
-            </DialogTitle>
-            <DialogDescription>
-              {shareImport && (
-                <>
-                  Add {formatSharedCityList(shareImport.keys)} to your clocks
-                  {shareImport.t != null && <> at {formatFrozenTime(shareImport.t, use24Hour)}</>}?
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => setShareImport(null)}
-              className="inline-flex items-center justify-center rounded-md border border-input bg-transparent px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
-              data-testid="button-share-import-cancel"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleAddShared}
-              autoFocus
-              className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-              data-testid="button-share-import-add"
-            >
-              Add
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </main>
   );
 }

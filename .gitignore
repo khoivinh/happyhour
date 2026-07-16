@@ -23,3 +23,10 @@ api/api
 
 # Change-request specs authored per-session (kept locally, not in repo)
 docs/*-happyhour-changes-*.md
+
+# Real dependency dir; iCloud skips any path ending in .nosync
+node_modules.nosync/
+
+# Playwright run artifacts (traces, screenshots, HTML report)
+test-results/
+playwright-report/

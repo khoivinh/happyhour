@@ -60,6 +60,18 @@ interface DigitalClockProps {
   isSelectMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: (zoneKey: string) => void;
+  /** Select-mode variant: this city is already on the recipient's board, so it shows a settled
+   *  gray check and can't be toggled — there's nothing to decide. Sharing View only. */
+  isLocked?: boolean;
+  /** Select-mode variant: selectable in principle, but the board is full right now. Distinct from
+   *  isLocked: unchecking another city frees this one, so it isn't disabled — just out of room.
+   *  Without this the tile looks identical to a checkable one and simply ignores taps. */
+  isBlocked?: boolean;
+  /** Select-mode variant: hold the hover skin at rest instead of tinting selected tiles.
+   *  The Sharing View is entirely made of tiles being offered, so the fill can't distinguish
+   *  anything — it marks the surface as a different mode, and the check carries selection.
+   *  (Figma 344:3787 pins every tile to --tile-states/hover.) */
+  pinHoverSkin?: boolean;
   isDragActive?: boolean;
   dragHandleListeners?: Record<string, unknown>;
   heroDate?: Date;
@@ -70,6 +82,10 @@ interface DigitalClockProps {
   /** When true (hero only), shows a small "Allow location for a closer match." hint
    *  next to the city name. Set by the caller after browser geolocation is denied. */
 }
+
+/** The tile's hover fill (Figma `--tile-states/hover`). Named because the Sharing View pins it on
+ *  at rest, where the hover pseudo-class can't reach it. */
+const HOVER_SKIN = "bg-[#f0f0f0] dark:bg-[#2a2a2a]";
 
 function CitySelector({
   selectedCityKey,
@@ -229,6 +245,9 @@ export function DigitalClock({
   isSelectMode = false,
   isSelected = false,
   onToggleSelect,
+  isLocked = false,
+  isBlocked = false,
+  pinHoverSkin = false,
   isDragActive = false,
   dragHandleListeners,
   heroDate,
@@ -416,21 +435,31 @@ export function DigitalClock({
   // Grid layout (only layout now)
   return (
     <>
-    {/* border-transparent on the base reserves 1px of border space in every
-        state so that transitioning to an active state (focus/drag) — which
-        swaps in a colored border — doesn't grow the tile or nudge its
-        contents. Active states switch the border color only; box dimensions
-        stay identical. transition-colors (added below) gives a smooth color
-        fade alongside the background-color transition. */}
+    {/* border-transparent on the base reserves 1px of border space in every state, so swapping in a
+        colored border doesn't grow the tile or nudge its contents — active states change the border
+        color only.
+
+        cn() is load-bearing here, not tidiness. `border-transparent` and a state's `border-[…]` have
+        identical specificity, so plain string interpolation leaves CSS source order to decide the
+        winner — and Tailwind emits `border-transparent` last. Every colored border below was
+        therefore dead, and the tile had no visible border in any state. (Select mode looked like it
+        did, but that was an inset ring standing in for the border that never painted; the ring also
+        let the fill bleed through the transparent border, reading as a second, paler stroke.)
+        twMerge drops the loser instead of leaving it to the stylesheet's ordering. */}
     <div
-      className={`relative rounded-[15px] px-2.5 pt-0.5 pb-3 border border-transparent
-      ${isRemoving ? "animate-out fade-out-0 zoom-out-95 [animation-duration:800ms] pointer-events-none" : ""}
-      ${isDragActive ? "transition-none" : "transition-[background-color,border-color,box-shadow] duration-300 ease-out"}
-      ${
+      className={cn(
+        "relative rounded-[15px] px-2.5 pt-0.5 pb-3 border border-transparent",
+        isRemoving && "animate-out fade-out-0 zoom-out-95 [animation-duration:800ms] pointer-events-none",
+        isDragActive ? "transition-none" : "transition-[background-color,border-color,box-shadow] duration-300 ease-out",
         isSelectMode
-          ? isSelected
-            ? "bg-[var(--tile-sel-bg)] border-[var(--tile-sel-border)] shadow-[inset_0_0_0_1px_var(--tile-sel-border)] cursor-pointer"
-            : "cursor-pointer"
+          ? pinHoverSkin
+            // Sharing View: every tile wears the hover skin at rest, so nothing here reads as
+            // "not chosen" — the check does that. Locked tiles aren't pointers (nothing to press);
+            // blocked ones say so rather than looking pressable and ignoring the press.
+            ? cn(HOVER_SKIN, isLocked ? "" : isBlocked ? "cursor-not-allowed" : "cursor-pointer")
+            : isSelected
+              ? "bg-[var(--tile-sel-bg)] border-[var(--tile-sel-border)] cursor-pointer"
+              : "cursor-pointer"
           : isBeingDragged
           ? "bg-[#fdf19d] dark:bg-[#4a4020] border-[#ffedbd] dark:border-[#5c4f2a] shadow-[0_1px_2px_rgba(0,0,0,0.15)]"
           : isDropdownOpen
@@ -441,20 +470,26 @@ export function DigitalClock({
                 ? "animate-highlight-yellow"
                 : isNew
                   ? "animate-highlight-yellow"
+                  // Same colours as HOVER_SKIN, but only on real hover-capable pointers — a
+                  // touch device would otherwise stick the tint on after a tap.
                   : "[@media(hover:hover)]:hover:bg-[#f0f0f0] [@media(hover:hover)]:dark:hover:bg-[#2a2a2a]"
-      }`}
+      )}
       data-testid={`clock-tile-${selectedZoneKey}`}
     >
       {/* Share select-mode: a full-tile tap layer toggles inclusion and makes the tile's
           inner controls inert. The check indicator itself lives in the ellipsis's flow slot
           (below) so the tile geometry is identical to normal mode. */}
-      {isSelectMode && (
+      {isSelectMode && !isLocked && (
         <button
           type="button"
           className="absolute inset-0 z-20 rounded-[15px]"
           onClick={() => selectedZoneKey && onToggleSelect?.(selectedZoneKey)}
           data-no-drag
           aria-pressed={isSelected}
+          // Still rendered and focusable when blocked — removing it would make the tile
+          // undiscoverable rather than merely unavailable — but announced as disabled, since
+          // pressing it does nothing until room is freed elsewhere.
+          aria-disabled={isBlocked || undefined}
           aria-label={`${isSelected ? "Remove" : "Add"} ${shortName} ${isSelected ? "from" : "to"} share`}
           data-testid={`button-select-${selectedZoneKey}`}
         />
@@ -639,14 +674,27 @@ export function DigitalClock({
             aria-hidden="true"
             data-testid={`select-check-${selectedZoneKey}`}
           >
+            {/* Four states, not two. Locked reads as a *settled* fact ("you already have this"),
+                so it's a filled check like selected — just muted, because there's no decision to
+                make. An empty circle would say "not chosen", which is the opposite of the truth.
+                Blocked keeps the empty circle (it genuinely isn't chosen) but fades it, so a tile
+                that can't currently be taken doesn't look identical to one that can. */}
             <span
-              className={`flex h-[17px] w-[17px] items-center justify-center rounded-full ${
-                isSelected
-                  ? "bg-foreground text-background"
-                  : "border-[1.5px] border-foreground/40"
-              }`}
+              className={cn(
+                "flex h-[17px] w-[17px] items-center justify-center rounded-full transition-colors",
+                isLocked
+                  ? "bg-foreground/30 text-background"
+                  : isSelected
+                    ? "bg-foreground text-background"
+                    : isBlocked
+                      ? "border-[1.5px] border-foreground/15"
+                      : "border-[1.5px] border-foreground/40"
+              )}
+              data-state={
+                isLocked ? "locked" : isSelected ? "selected" : isBlocked ? "blocked" : "unselected"
+              }
             >
-              {isSelected && <Check className="h-[11px] w-[11px]" strokeWidth={3} />}
+              {(isSelected || isLocked) && <Check className="h-[11px] w-[11px]" strokeWidth={3} />}
             </span>
           </div>
         )}

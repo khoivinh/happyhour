@@ -7,13 +7,13 @@ Last updated: 2026-07-16
 World clock + timezone converter (fka Khlock). No backend; weather via Open-Meteo (no API key).
 
 ## Current state
-- **2026-07-16 — branch `sharing-view`, uncommitted.** Incoming `?z=` links land on a new **Sharing View** (Figma `344:3787`) rather than a modal asking "Add shared clocks?" before showing anything: cities run live, checks are interactive, already-owned ones lock, and the 16-cap pre-checks what fits instead of truncating after you agree. The "two strokes" in Happy select mode was **a border that never painted** — `border-transparent` beat every state's `border-[…]` — with an inset ring standing in for it; same bug on the commit bar. Happy's `--tile-sel-border` retuned by CIELAB measurement (47.2 → 5.7), dark followed. Also: Copy Link, a shared `CommitBar`, 3px tile margins, per-theme highlight, and a fix for shared links flashing the recipient's own board. 52 tests, 520 runs green. → `docs/2026-07-16-devlog.md`
-- **2026-07-16 — the project's first test suite, uncommitted** (sits under the branch above). There had never been one: every past "N assertions pass" came from scratchpad scripts, all since wiped. `@playwright/test` committed properly; runs against a **prod build**, since `analytics.ts` no-ops unless `import.meta.env.PROD`. → `docs/2026-07-16-devlog.md`
+- **2026-07-16 — merged to `main` (`7b3291c`), live on happyhour.day.** Incoming `?z=` links land on a new **Sharing View** (Figma `344:3787`) rather than a modal asking "Add shared clocks?" before showing anything: cities run live, checks are interactive, already-owned ones lock, and the 16-cap pre-checks what fits instead of truncating after you agree. The "two strokes" in Happy select mode was **a border that never painted** — `border-transparent` beat every state's `border-[…]` — with an inset ring standing in for it; same bug on the commit bar. Happy's `--tile-sel-border` retuned by CIELAB measurement (47.2 → 5.7), dark followed. Also: Copy Link, a shared `CommitBar`, 3px tile margins, per-theme highlight, and a fix for shared links flashing the recipient's own board. 52 tests, 520 runs green. → `docs/2026-07-16-devlog.md`
+- **2026-07-16 — the project's first test suite** (merged alongside the above). There had never been one: every past "N assertions pass" came from scratchpad scripts, all since wiped. `@playwright/test` committed properly; runs against a **prod build**, since `analytics.ts` no-ops unless `import.meta.env.PROD`. → `docs/2026-07-16-devlog.md`
 
 Older entries: `STATUS-archive.md`.
 
 ## Next steps
-- Review + merge `sharing-view` (the test suite rides with it) — both uncommitted
+- Judge the four design calls below **live on happyhour.day** — they shipped as-is, unresolved
 - Sign off or revert dark's select stroke `#5c4f2a` → `#473d21`: done per "no darker than needed in each of the three modes", but you only asked about Happy. One token
 - Copy calls: "Room for one more — Happyhour holds 16." is drafted, not specified; and the surface says "time zones" (headline, per Figma) vs "cities" (bar, per spec) for one object
 - Does the locked gray check read as "already added" or as disabled? Spec says gray check; the HIG critic argues gray is the vocabulary for *inert* and wants a caption

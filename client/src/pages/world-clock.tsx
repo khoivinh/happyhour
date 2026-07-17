@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { TimeZoneConverter } from "@/components/time-zone-converter";
 import { SharedLinkView } from "@/components/shared-link-view";
 import { Sidebar, DrawerToggleIcon } from "@/components/sidebar";
-import { getCityByKey, loadTopCities } from "@/lib/city-lookup";
+import { getCityByKey, loadCities, loadTopCities } from "@/lib/city-lookup";
 import { useCloudSync } from "@/hooks/use-cloud-sync";
 import { useTheme } from "@/lib/theme-provider";
 import { initZonesFromStorage, MAX_CLOCKS } from "@/components/time-zone-converter";
@@ -202,16 +202,29 @@ export default function WorldClock() {
     const t = Number.isFinite(tNum) ? tNum : null;
 
     let cancelled = false;
-    loadTopCities().then(() => {
-      if (cancelled) return;
-      const keys = candidates.filter((k) => getCityByKey(k));
-      if (keys.length > 0) {
-        setShareImport({ keys, t });
-        track("share_link_opened", { count: keys.length });
-      }
-      // Batched with setShareImport above, so the board and the Sharing View never both render.
-      settled();
-    });
+    // The top tier is 500 cities; the full set is 30k. A sender can share any of them, so resolving
+    // against the top tier alone silently dropped 98% of the map — and the headline then counted the
+    // survivors and stated the wrong number with total confidence. Try the cheap tier first (most
+    // links are big cities, and it's already in the initial payload), and only pay for the 2 MB when
+    // a key isn't in it. Keys are stable across the two tiers — cities-top.json is a
+    // population-ordered prefix of cities.json, and key collisions resolve by descending population,
+    // so both derive the same key for the same city — which is what makes this fallback safe.
+    loadTopCities()
+      .then(() => {
+        if (cancelled || candidates.every((k) => getCityByKey(k))) return;
+        // A failed full load is not fatal: fall through and show whatever the top tier resolved.
+        return loadCities().catch(() => undefined);
+      })
+      .then(() => {
+        if (cancelled) return;
+        const keys = candidates.filter((k) => getCityByKey(k));
+        if (keys.length > 0) {
+          setShareImport({ keys, t });
+          track("share_link_opened", { count: keys.length });
+        }
+        // Batched with setShareImport above, so the board and the Sharing View never both render.
+        settled();
+      });
     return () => {
       cancelled = true;
     };

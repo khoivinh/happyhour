@@ -75,6 +75,23 @@ test.describe("arriving on a shared link", () => {
     await expect(page.getByTestId("text-share-headline")).toHaveText("One time zone shared with you.");
   });
 
+  /** Keys are resolved against cities-top.json (500 cities) because it's already in the initial
+   *  payload — but a sender can share any of the 30k in cities.json, and 98% of them live only
+   *  there. Those silently failed to resolve and were filtered out, and the headline then counted
+   *  the survivors: a three-city link arrived announcing "Two time zones shared with you."
+   *  Heidelberg is the real case that surfaced it — big enough to share, far outside the top 500. */
+  test("resolves cities outside the top-500 bundle", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await dismissBanner(page);
+
+    await page.goto("/?z=losAngeles_US,newYorkCity_US,heidelberg_DE");
+    await expect(page.getByTestId("text-share-headline")).toHaveText(
+      "Three time zones shared with you."
+    );
+    await expect(sharedTiles(page)).toHaveCount(3);
+    await expect(page.getByTestId("shared-zone-heidelberg_DE")).toContainText("Heidelberg");
+  });
+
   test("reports the offered count when the link is opened", async ({ page }) => {
     await page.addInitScript(seedZones(["chicago_US"]));
     await dismissBanner(page);
@@ -346,5 +363,63 @@ test.describe("a frozen share (&t=)", () => {
     await expect(tiles(page)).toHaveCount(2);
     // The board lands in custom mode holding the same instant, so Reset is offered.
     await expect(page.getByTestId("clock-tile-tokyo_JP")).toContainText("4:00");
+  });
+});
+
+/** Every other test in this file calls dismissBanner() first, which is exactly why this bug shipped:
+ *  the suite systematically removed the only condition that triggers it. A recipient opening a
+ *  shared link is a first-time visitor by definition — the cookie banner is *always* up for them,
+ *  so this is the one state the share flow can least afford to get wrong.
+ *
+ *  Silktide pins its banner to the bottom at z-index 99999. The bar can't out-stack that, and
+ *  shouldn't: burying a consent prompt is the one thing that surface must never do. So the bar
+ *  yields, and these tests hold it to that. No dismissBanner() here, deliberately. */
+test.describe("the cookie banner and the commit bar", () => {
+  /** Polls rather than reading once. The banner is injected late, the bar reacts to it, and the
+   *  step-up is a 200ms transition — so there's a window where the bar is legitimately still on its
+   *  way. A single read lands mid-flight and reports the un-lifted position, which looks exactly
+   *  like the bug. The claim being tested is about where the bar comes to rest. */
+  test("the bar sits clear of the banner instead of under it", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await page.goto("/?z=tokyo_JP,newYorkCity_US");
+
+    await expect(page.locator("#stcm-banner")).toBeVisible();
+    await expect(importBar(page)).toBeVisible();
+
+    await expect(async () => {
+      const bannerBox = (await page.locator("#stcm-banner").boundingBox())!;
+      const barBox = (await importBar(page).boundingBox())!;
+      expect(barBox.y + barBox.height).toBeLessThanOrEqual(bannerBox.y);
+    }).toPass({ timeout: 5000 });
+  });
+
+  /** The assertion that actually matters: geometry can look right while something invisible still
+   *  eats the click. Playwright refuses to click an element another element would intercept, so
+   *  this fails on the shipped bug — where the banner covered 67 of the bar's 86px. */
+  test("Add is clickable while the banner is up", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await page.goto("/?z=tokyo_JP,newYorkCity_US");
+
+    await expect(page.locator("#stcm-banner")).toBeVisible();
+    await page.getByTestId("button-share-import-add").click({ timeout: 5000 });
+    await expect(tiles(page)).toHaveCount(3);
+  });
+
+  /** The lift has to be temporary, or answering the banner would leave a permanent 67px hole.
+   *  Asserted against the viewport rather than against an earlier reading of the bar: a "before"
+   *  captured mid-transition isn't a fact to compare against. */
+  test("the bar drops back down once the banner is answered", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await page.goto("/?z=tokyo_JP,newYorkCity_US");
+    await expect(page.locator("#stcm-banner")).toBeVisible();
+
+    await page.locator("#stcm-banner").getByRole("button", { name: "Accept all" }).click();
+    await expect(page.locator("#stcm-banner")).toBeHidden();
+
+    // Back to resting: the bar's own 16px bottom padding is all that's below it.
+    const viewport = page.viewportSize()!.height;
+    await expect
+      .poll(async () => Math.round((await importBar(page).boundingBox())!.y + (await importBar(page).boundingBox())!.height), { timeout: 5000 })
+      .toBeGreaterThan(viewport - 24);
   });
 });

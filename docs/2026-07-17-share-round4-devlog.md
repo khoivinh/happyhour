@@ -75,10 +75,23 @@ The Pages front-end is 100% static, so every shared link previewed identically (
   when reverted, then restored.
 - Skipped the 2-critic design loop (opt-in now; Khoi judges live).
 
+## Deploy — first attempt failed, then fixed
+
+The first push (`f177a43`) **failed the Cloudflare Pages build** — prod kept serving round 3. Local
+`wrangler pages functions build` (4.112) compiled fine, so the cause was an environment gap: the
+function's edge-only novelties didn't survive Cloudflare's build image. The original `preview.ts`
+imported `cities-top.json` from `../../client/src/data` **with `{ type: "json" }`** — a cross-directory
+reach plus a bleeding-edge import attribute, either of which a slightly older esbuild rejects.
+
+Fix: made the function fully self-contained. `scripts/build-city-names.mjs` generates
+`functions/lib/city-names.ts` — a plain `Record<string, string>` key→name snapshot of the top 500
+(replaying the client's key algorithm) — and `preview.ts` imports that local TS module. No JSON import,
+no import attribute, no cross-directory reach. `wrangler pages functions build` + `wrangler pages dev`
++ the 69-test suite all re-verified before the second push. Regenerate with `npm run build:city-names`
+when `cities-top.json` changes.
+
 ## Open / notes
 
-- `functions/lib/preview.ts` imports the JSON with `with { type: "json" }` — needed for Playwright's
-  Node ESM loader; esbuild/wrangler accept it too.
 - Top-500 name map: an obscure-city share (outside the top tier) previews as "N locations" rather than
   by name. Extending to the full 30 k set is a build-step follow-up, not built.
 - `share_link_opened` still re-fires on refresh (round-3 carryover); dedupe is a one-liner if wanted.

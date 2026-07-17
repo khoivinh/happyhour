@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "build:top-cities": "node scripts/build-top-cities.mjs"
+    "build:top-cities": "node scripts/build-top-cities.mjs",
+    "build:city-names": "node scripts/build-city-names.mjs"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.4",

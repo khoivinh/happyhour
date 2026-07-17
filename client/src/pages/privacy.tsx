@@ -66,7 +66,7 @@ export default function Privacy() {
         <button
           type="button"
           onClick={openCookiePreferences}
-          className="bg-[#FFD900] text-[#333] font-bold text-[10px] uppercase rounded-[6px] py-[9px] px-[12px] hover:opacity-90 transition-opacity focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#333]"
+          className="cookie-prefs-button bg-[#FFD900] text-[#333] font-bold text-[10px] uppercase rounded-[6px] py-[9px] px-[12px] hover:opacity-90 transition-opacity focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#333]"
         >
           Cookie preferences
         </button>

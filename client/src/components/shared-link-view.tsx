@@ -30,10 +30,10 @@ const NUMBER_WORDS = [
  *  past sixteen (more than a board can hold) digits are fine — nobody reads "twenty-three" as prose. */
 function headlineFor(count: number, live: boolean): string {
   const word = NUMBER_WORDS[count] ?? String(count);
-  const where = count === 1 ? "this location" : `these ${word} locations`;
+  const where = count === 1 ? "this city" : `these ${word} cities`;
   return live
-    ? `Current time in ${where}.`
-    : `Time zone conversion for ${where}.`;
+    ? `Here's the current time in ${where}.`
+    : `Here's the time zone conversion for ${where}.`;
 }
 
 /**
@@ -58,8 +58,11 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
   const room = Math.max(0, MAX_CLOCKS - ownedKeys.length);
   const newKeys = useMemo(() => keys.filter((k) => !owned.has(k)), [keys, owned]);
 
-  // Arrival is Select Mode; dismissing the bar exits to Resting (the reusable world clock).
-  const [mode, setMode] = useState<"select" | "resting">("select");
+  // Arrival is Select Mode — unless the recipient already owns every shared city (nothing to add):
+  // then skip straight to Resting, so there's no Commit Bar to dismiss and no selection to make.
+  const [mode, setMode] = useState<"select" | "resting">(
+    newKeys.length === 0 ? "resting" : "select"
+  );
   // Pre-check what fits, in link order. Beyond that the recipient swaps rather than overflows:
   // nothing can be selected that wouldn't survive the merge, so Add never silently drops a city.
   const [selected, setSelected] = useState<Set<string>>(() => new Set(newKeys.slice(0, room)));
@@ -131,6 +134,17 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
     onDismiss?.();
   }, [onDismiss]);
 
+  // Esc is the keyboard equivalent of Cancel: it drops Select Mode to Resting without tearing the
+  // view down. Mirrors the board's share-mode Escape handler (time-zone-converter.tsx).
+  useEffect(() => {
+    if (mode !== "select") return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") dismissBar();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mode, dismissBar]);
+
   /** "Save {city}" from a resting tile: re-enter Select Mode with just this city checked. An owned
    *  or over-cap city has nothing to pre-check, so the bar opens at Add-0 and the recipient picks. */
   const saveFromRest = useCallback(
@@ -161,12 +175,11 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
           }`}
         >
           <div className="min-h-0 overflow-hidden px-[10px] pb-[32px]">
-            {/* Same type as the onboarding tagline (Figma's spec for both is identical), but not
-                its sm:w-3/5 — that width is tuned to break "Welcome to the indispensable world
-                clock." into two lines. This sentence is shorter and Figma sets it on one, so it
-                gets the full column and wraps only when a narrow screen makes it. */}
+            {/* Same type and width as the onboarding tagline (sm:w-3/5, ~60% on desktop) so the two
+                headlines share a column measure. These sentences ("Here's the current time in these
+                N cities.") run long enough to want the constrained width; below sm it goes full. */}
             <h2
-              className="w-full font-display font-black text-foreground text-[36px] leading-[38px] tracking-[-1px]"
+              className="w-full sm:w-3/5 font-display font-black text-foreground text-[36px] leading-[38px] tracking-[-1px]"
               data-testid="text-share-headline"
             >
               {headlineFor(keys.length, !frozen)}

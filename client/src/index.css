@@ -358,6 +358,17 @@
   color: #FFD900;
 }
 
+/* Cookie Preferences button (privacy.tsx). Its default bg (#FFD900) IS the happy background, so the
+   button disappears here; invert to the same dark surface + yellow text the offline banner uses.
+   Light/dark keep the yellow. The default focus ring (#333) would vanish on the dark bg too. */
+.happy .cookie-prefs-button {
+  background-color: #333333;
+  color: #FFD900;
+}
+.happy .cookie-prefs-button:focus-visible {
+  outline-color: #FFD900;
+}
+
 /* Tile context menu stroke in Happy mode. The default --border (51 60% 40%) is a dark gold that
    reads as a heavy outline on the white popover; soften it to a light gold. */
 .happy .share-tile-menu {

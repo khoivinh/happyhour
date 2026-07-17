@@ -59,7 +59,7 @@ test.describe("arriving on a shared link", () => {
     await page.goto("/?z=tokyo_JP,newYorkCity_US");
     // A live share (no &t=) describes the clocks as showing the current time.
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Current time in these two locations."
+      "Here's the current time in these two cities."
     );
     await expect(sharedTiles(page)).toHaveCount(2);
     await expect(importBar(page)).toContainText("Add these clocks to your Happyhour?");
@@ -77,7 +77,7 @@ test.describe("arriving on a shared link", () => {
 
     await page.goto("/?z=tokyo_JP");
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Current time in this location."
+      "Here's the current time in this city."
     );
   });
 
@@ -92,7 +92,7 @@ test.describe("arriving on a shared link", () => {
 
     await page.goto("/?z=losAngeles_US,newYorkCity_US,heidelberg_DE");
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Current time in these three locations."
+      "Here's the current time in these three cities."
     );
     await expect(sharedTiles(page)).toHaveCount(3);
     await expect(page.getByTestId("shared-zone-heidelberg_DE")).toContainText("Heidelberg");
@@ -181,13 +181,18 @@ test.describe("choosing which cities to take", () => {
     await expect(importBar(page)).toContainText("Add 1");
   });
 
-  test("says so when there is nothing left to add", async ({ page }) => {
+  test("skips Select Mode entirely when the recipient already owns every shared city", async ({ page }) => {
+    // Nothing to add, so entering Select Mode would only offer an empty, disabled Commit Bar. Land
+    // directly in Resting instead — browsable clocks, each with the inert "Already saved" menu.
     await page.addInitScript(seedZones(["tokyo_JP", "paris_FR"]));
     await dismissBanner(page);
 
     await page.goto("/?z=tokyo_JP,paris_FR");
-    await expect(importBar(page)).toContainText("You already have these clocks.");
-    await expect(page.getByTestId("button-share-import-add")).toBeDisabled();
+    await expect(sharedTiles(page)).toHaveCount(2);
+    await expect(importBar(page)).toHaveCount(0);
+    await expect(page.getByTestId("button-tile-menu-tokyo_JP")).toBeVisible();
+    // It never entered Select Mode, so nothing was dismissed.
+    expect(await trackedEvents(page, "share_link_dismissed")).toEqual([]);
   });
 
   test("Add disables when everything is unchecked", async ({ page }) => {
@@ -347,6 +352,22 @@ test.describe("committing", () => {
     expect(await trackedEvents(page, "share_link_added")).toEqual([]);
   });
 
+  test("Esc drops to the resting view, same as Cancel", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await dismissBanner(page);
+
+    await page.goto("/?z=tokyo_JP,paris_FR");
+    await expect(importBar(page)).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    // Escape is the keyboard equivalent of Cancel: the bar goes, the view stays, the tiles rest.
+    await expect(importBar(page)).toHaveCount(0);
+    await expect(sharedTiles(page)).toHaveCount(2);
+    await expect(page.getByTestId("button-tile-menu-tokyo_JP")).toBeVisible();
+    await expect(page).toHaveURL(/\?z=/);
+    expect(await trackedEvents(page, "share_link_dismissed")).toEqual([{ count: 2 }]);
+  });
+
   test("confirming does not also report a dismissal", async ({ page }) => {
     await page.addInitScript(seedZones(["chicago_US"]));
     await dismissBanner(page);
@@ -384,7 +405,7 @@ test.describe("a frozen share (&t=)", () => {
     await page.goto(`/?z=tokyo_JP&t=${FROZEN}`);
     // A custom-time share reads as a conversion, and the frozen instant shows (Tokyo 04:00).
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Time zone conversion for this location."
+      "Here's the time zone conversion for this city."
     );
     await expect(page.getByTestId("shared-zone-tokyo_JP")).toContainText("4:00");
     // In Select Mode the link's slot is reserved but the link itself is hidden — there's no
@@ -403,14 +424,14 @@ test.describe("a frozen share (&t=)", () => {
     await resetLink.click();
     await expect(resetLink).toHaveText("Restore Custom Time");
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Current time in this location."
+      "Here's the current time in this city."
     );
 
     // Restore brings the frozen instant back, verbatim.
     await resetLink.click();
     await expect(resetLink).toHaveText("Reset Time");
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Time zone conversion for this location."
+      "Here's the time zone conversion for this city."
     );
     await expect(page.getByTestId("shared-zone-tokyo_JP")).toContainText("4:00");
   });

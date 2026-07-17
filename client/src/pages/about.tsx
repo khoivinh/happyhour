@@ -11,7 +11,7 @@ const LINK_CLASS =
 
 export default function About() {
   return (
-    <SitePageLayout title="About">
+    <SitePageLayout title="It's always that time somewhere!">
       <p className="text-[14px] leading-[22px] text-foreground">
         <a
           href="https://happyhour.day"
@@ -21,7 +21,7 @@ export default function About() {
         >
           Happyhour
         </a>{" "}
-        is a world clock designed and developed by Khoi Vinh in Brooklyn, NY. Stay tuned for an iOS version. For more information, visit{" "}
+        is a time zone tool designed and developed by Khoi Vinh in Brooklyn, NY. Stay tuned for an iOS version. For more information, visit{" "}
         <a
           href="https://designdept.com"
           target="_blank"

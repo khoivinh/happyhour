@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 const CONTENT_ROUTES = [
-  { path: "/about", heading: "About" },
+  { path: "/about", heading: "It's always that time somewhere!" },
   { path: "/privacy", heading: "Privacy" },
   { path: "/support", heading: "Support" },
 ] as const;
@@ -65,7 +65,9 @@ test.describe("footer navigation", () => {
   test("the footer's About link returns to the home page", async ({ page }) => {
     await page.goto("/privacy");
     await siteFooter(page).getByRole("link", { name: "About" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "About" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "It's always that time somewhere!" })
+    ).toBeVisible();
   });
 });
 

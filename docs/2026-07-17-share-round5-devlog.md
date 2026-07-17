@@ -66,4 +66,14 @@ on-brand; light/dark keep the yellow button unchanged.
 - **Edge OG-preview copy** (`functions/lib/preview.ts`, "Current time in Tokyo, Paris & …") was left
   as-is — different construction (names cities, no "these N"), and Khoi didn't mention previews this
   round. Flag if he wants "cities" alignment there too.
-- Not yet pushed — awaiting Khoi's go.
+
+## Deploy — shipped + live
+
+- `9c57f0b` — round 5 as described above. Pushed to `main`; Cloudflare build Active; prod cut over
+  (bundle `index-PxD57QtD.js`). Verified on happyhour.day: all new copy present, `.happy
+  .cookie-prefs-button` in the served CSS, round-4 edge previews still injecting for `text/html`
+  crawler requests.
+- `7b8862f` — same-day wording revert: dropped the "Here's the" lead-in from the headline (Khoi
+  changed his mind), back to "Current time in these N cities." / "Time zone conversion for these N
+  cities." Pushed; build Active; prod cut over (bundle `index-1NDBDzcK.js`); confirmed "Here's the"
+  is absent from the deployed bundle. (No `functions/` change, so no repeat of the round-4 build risk.)

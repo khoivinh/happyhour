@@ -35,8 +35,8 @@ async function enterSelectMode(page: Page, seed: string[], shareSheet: boolean) 
 
 test.beforeEach(async ({ page }) => {
   await blockExternal(page);
-  // The "Link copied" toast has Radix's default 5s life, so asserting it races a wall clock under
-  // contention. install() alone does NOT stop time (it ticks along with it) — pauseAt is what
+  // Copy Link's inline "Copied" restores itself on a 3s timer, so asserting it races a wall clock
+  // under contention. install() alone does NOT stop time (it ticks along with it) — pauseAt is what
   // freezes timers. Aim ahead of "now": the fake clock ticks between the two calls, and pauseAt
   // rejects a time already in its past. Nothing is scheduled yet, so the jump fires nothing.
   await page.clock.install();
@@ -52,7 +52,7 @@ test.describe("with a native share sheet", () => {
     await expect(page.getByTestId("button-share-commit")).toHaveText("Share 1");
   });
 
-  test("Share hands the link to the sheet rather than the clipboard", async ({ page }) => {
+  test("Share hands the link to the sheet and leaves the bar up", async ({ page }) => {
     await enterSelectMode(page, ["tokyo_JP", "paris_FR"], true);
     await page.getByTestId("button-share-commit").click();
 
@@ -60,6 +60,9 @@ test.describe("with a native share sheet", () => {
     expect(shared).toHaveLength(1);
     expect(shared[0].url).toMatch(/\/\?z=tokyo_JP$/);
     expect(await trackedEvents(page, "share_committed")).toEqual([{ count: 1, method: "native" }]);
+    // The bar is stable after the sheet returns — the user may want to copy the link too, or
+    // share again, so yanking the selection out from under them is exactly what we removed.
+    await expect(bar(page)).toBeVisible();
   });
 });
 
@@ -120,7 +123,7 @@ test.describe("the strokes actually paint", () => {
 test.describe("Copy Link", () => {
   test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
-  test("copies the link, says so, and leaves select mode", async ({ page }) => {
+  test("copies the link, confirms inline on the button, and keeps the bar up", async ({ page }) => {
     await enterSelectMode(page, ["tokyo_JP", "paris_FR"], true);
     // Include Paris too, so the link carries more than the tile that launched the flow.
     await page.getByTestId("button-select-paris_FR").click();
@@ -133,8 +136,10 @@ test.describe("Copy Link", () => {
     // along — asserted as-is rather than as the prettier form the docs describe.
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied).toMatch(/\/\?z=tokyo_JP%2Cparis_FR$/);
-    await expect(page.getByText("Link copied")).toBeVisible();
-    await expect(bar(page)).toHaveCount(0);
+    // The confirmation is on the button itself now — no toast — and the bar stays put so the
+    // selection isn't torn down just for copying a link.
+    await expect(page.getByTestId("button-share-copy")).toHaveText("Copied");
+    await expect(bar(page)).toBeVisible();
     // No sheet was opened — this path is the clipboard, not a silent share.
     expect(await page.evaluate(() => (window as any).__shared)).toHaveLength(0);
     expect(await trackedEvents(page, "share_committed")).toEqual([{ count: 2, method: "copy" }]);

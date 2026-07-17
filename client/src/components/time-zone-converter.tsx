@@ -27,7 +27,6 @@ import { getAllCities, getCityByKey, searchCities, getTimeInCityZone, formatCity
 import { cacheTileMetadata, getCityOrCachedTile } from "@/lib/tile-cache";
 import { resolveLocalCity } from "@/lib/closest-city";
 import { track } from "@/lib/analytics";
-import { toast } from "@/hooks/use-toast";
 import { ShareSelectionBar } from "@/components/share-selection-bar";
 
 // Track recent touch events so we can suppress synthetic mouse events on mobile.
@@ -344,10 +343,17 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   const [canNativeShare] = useState(
     () => typeof navigator !== "undefined" && typeof navigator.share === "function"
   );
+  // Copy Link confirms inline by swapping its own label to "Copied" for a beat, rather than firing a
+  // toast — the confirmation belongs on the control the user just pressed. Timer ref so the label
+  // restores after 3s and can't outlive the component.
+  const [linkCopied, setLinkCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
 
   const enterShareMode = useCallback((seedKey: string) => {
     setShareSelection(new Set([seedKey]));
     setIncludeLocal(false);
+    setLinkCopied(false);
     setShareMode(true);
     track("share_started");
   }, []);
@@ -412,8 +418,10 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     } catch {
       /* native share sheet cancelled — nothing to do */
     }
-    cancelShareMode();
-  }, [shareKeys, buildShareUrl, cancelShareMode]);
+    // The bar stays put after the sheet closes: the user may want to copy the link too, or share
+    // again, and yanking the selection out from under them the moment the OS sheet dismisses is
+    // exactly the kind of instability this round is removing.
+  }, [shareKeys, buildShareUrl]);
 
   const copyShareLink = useCallback(async () => {
     if (shareKeys.length === 0) return;
@@ -421,14 +429,17 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     track("share_committed", { count: shareKeys.length, method: "copy" });
     try {
       await navigator.clipboard.writeText(url);
-      toast({ title: "Link copied", description: "Share it to add these clocks." });
     } catch {
       /* clipboard blocked (insecure context, or permission denied) — leave select mode intact
          so the selection isn't silently lost with nothing to show for it. */
       return;
     }
-    cancelShareMode();
-  }, [shareKeys, buildShareUrl, cancelShareMode]);
+    // Inline "Copied" on the button, and the bar stays up — copying a link isn't committing the
+    // share, so the selection shouldn't be torn down.
+    setLinkCopied(true);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setLinkCopied(false), 3000);
+  }, [shareKeys, buildShareUrl]);
 
   // Three-tier load: top (fast, inline bundle) → cache fallback → full (lazy).
   useEffect(() => {
@@ -787,7 +798,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
               }}
               data-testid="button-add-timezone"
             >
-              Add Time Zone
+              Add Clock
               <ChevronsUpDown className="h-3 w-3 opacity-50" />
             </button>
           </div>
@@ -927,6 +938,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
           onCancel={cancelShareMode}
           onShare={commitShare}
           onCopyLink={copyShareLink}
+          linkCopied={linkCopied}
           canNativeShare={canNativeShare}
         />
       )}

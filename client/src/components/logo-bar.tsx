@@ -18,8 +18,6 @@ import { useTheme } from "@/lib/theme-provider";
 export function LogoBar({ linkHome = false }: { linkHome?: boolean }) {
   const { resolvedTheme } = useTheme();
   const logoVariant = resolvedTheme === "happy" ? "happy" : "default";
-  // Figma spec per theme: light/happy wordmark = #000000, dark = white.
-  const wordmarkColor = resolvedTheme === "dark" ? "#FFFFFF" : "#000000";
 
   const lockup = (
     <>
@@ -27,10 +25,9 @@ export function LogoBar({ linkHome = false }: { linkHome?: boolean }) {
           wordmark's visual center (not its bounding-box center). Fixed, so it does not scale with
           the wordmark below 500px — which is why one icon-top value covers both breakpoints. */}
       <div className="flex flex-col items-start pt-[9px] shrink-0">
-        <HappyhourWordmark
-          className="shrink-0 h-[43px] max-[499px]:h-[31.39px] w-auto"
-          style={{ color: wordmarkColor }}
-        />
+        {/* Wordmark ink tracks --foreground so it matches the hero clock and body text (#333 light,
+            #1A1A1A happy, #E6E6E6 dark) rather than reading as a purer black than everything else. */}
+        <HappyhourWordmark className="shrink-0 h-[43px] max-[499px]:h-[31.39px] w-auto text-foreground" />
       </div>
       {/* Round mark sits to the RIGHT of the wordmark (Figma 329:3382 → 329:3381).
           0.73 below 500px matches the Figma mobile variant ratio (31.68 / 43.392); mt-[2px] there

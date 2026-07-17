@@ -22,7 +22,7 @@ export default function Privacy() {
         >
           Happyhour
         </a>
-        , we store the cities you've added and your display preferences so they sync across your devices. We use{" "}
+        , we store the clocks you've added and your display preferences so they sync across your devices. We use{" "}
         <a
           href="https://clerk.com"
           target="_blank"

@@ -166,10 +166,11 @@ export default function WorldClock() {
     track("custom_time_reset");
   }
 
-  // Parse an incoming shared link once on load: read ?z= / ?t=, strip the params immediately so
-  // a refresh never re-prompts, then resolve the keys AFTER the city lookup is loaded (it loads
-  // async, and getCityByKey returns undefined before then — resolving too early would silently
-  // drop every shared city). Unknown keys are dropped; a valid set feeds the preview dialog.
+  // Parse an incoming shared link on load: read ?z= / ?t=, then resolve the keys AFTER the city
+  // lookup is loaded (it loads async, and getCityByKey returns undefined before then — resolving
+  // too early would silently drop every shared city). The params are kept in the URL on purpose:
+  // the Sharing View is a place the recipient can keep, so a refresh re-enters it rather than
+  // dropping to the board. handleAddShared clears the URL once the share is consumed.
   useEffect(() => {
     // Every exit path must land here, or a link that resolves to nothing would leave the board
     // held back forever on a blank page.
@@ -187,11 +188,6 @@ export default function WorldClock() {
     if (!rawKeys) {
       settled();
       return;
-    }
-    try {
-      window.history.replaceState(null, "", window.location.pathname);
-    } catch {
-      /* history blocked — the Sharing View still works, refresh may re-prompt */
     }
     const candidates = rawKeys.split(",").map((k) => k.trim()).filter(Boolean);
     if (candidates.length === 0) {
@@ -260,11 +256,19 @@ export default function WorldClock() {
       capped: shareImport.keys.filter((k) => !selectedZones.includes(k)).length > MAX_CLOCKS - selectedZones.length,
     });
     setShareImport(null);
+    // The share is consumed — drop ?z=/?t= so a later refresh shows the board, not the view again.
+    // replaceState, not push: adding clocks isn't a place to Back into (unlike the logo escape).
+    try {
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch {
+      /* history blocked — the added clocks still stand; a refresh would just re-enter the view */
+    }
   }
 
-  function handleDismissShared() {
+  /** The recipient dismissed the Commit Bar (Select Mode → Resting). Analytics only — the view
+   *  stays; escaping it is the logo's job. */
+  function handleShareBarDismissed() {
     if (shareImport) track("share_link_dismissed", { count: shareImport.keys.length });
-    setShareImport(null);
   }
 
   // Retire the arrival highlight once it has had time to play. Not cosmetic housekeeping: the
@@ -310,7 +314,10 @@ export default function WorldClock() {
     // feedback loop cannot form, and guarantees SCROLL_RANGE is always reachable.
     // lvh (not dvh/svh) keeps the runway intact in every mobile URL-bar state.
     <main className="min-h-[calc(100lvh+120px)] bg-background flex flex-col">
-      <LogoBar />
+      {/* In the Sharing View the logo is the way out: a real link to the main board. It's a full
+          navigation on purpose — Back then reloads the shared URL and re-enters the view (the params
+          are no longer stripped), which is far more reliable than reconstructing it from SPA history. */}
+      <LogoBar linkHome={Boolean(shareImport)} />
 
       {/* Menu layer — fixed, mirrors the content column's horizontal layout exactly.
           The drawer toggle lives HERE rather than in the header for two reasons:
@@ -334,10 +341,15 @@ export default function WorldClock() {
             onClick={handleToggleSidebar}
             disabled={shareActive}
             style={{ top: `${TOGGLE_TOP}px` }}
+            /* Color tracks the theme instead of a hardcoded gray: the normal state matches the
+               "Add Clock" button (both text-muted-foreground, so Happy reads #4D4D4D not #6B7280),
+               and the inert select-mode state is the same token dimmed — always lower-contrast than
+               normal in every theme, which is what stops dark mode from inverting (its old #C4C7CC
+               read brighter than the normal #6B7280 on a dark ground). */
             className={`absolute right-[10px] transition-colors ${
               shareActive
-                ? "text-[#C4C7CC] pointer-events-none"
-                : "pointer-events-auto text-[#6B7280] hover:text-[#374151]"
+                ? "text-muted-foreground/40 pointer-events-none"
+                : "pointer-events-auto text-muted-foreground hover:text-foreground"
             }`}
             aria-label={sidebarOpen ? "Close menu" : "Open menu"}
             aria-expanded={sidebarOpen}
@@ -384,7 +396,7 @@ export default function WorldClock() {
               ownedKeys={selectedZones}
               use24Hour={use24Hour}
               onAdd={handleAddShared}
-              onCancel={handleDismissShared}
+              onDismiss={handleShareBarDismissed}
             />
           ) : sharePending ? null : (
             <TimeZoneConverter

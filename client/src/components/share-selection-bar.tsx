@@ -9,6 +9,8 @@ interface ShareSelectionBarProps {
   onCancel: () => void;
   onShare: () => void;
   onCopyLink: () => void;
+  /** True for ~3s after a successful copy — swaps the button label to "Copied" instead of a toast. */
+  linkCopied: boolean;
   /** Whether this browser can open a native share sheet. Decides whether Share renders at all. */
   canNativeShare: boolean;
 }
@@ -31,6 +33,7 @@ export function ShareSelectionBar({
   onCancel,
   onShare,
   onCopyLink,
+  linkCopied,
   canNativeShare,
 }: ShareSelectionBarProps) {
   const canShare = count > 0;
@@ -66,7 +69,7 @@ export function ShareSelectionBar({
           disabled={!canShare}
           testId="button-share-copy"
         >
-          Copy Link
+          {linkCopied ? "Copied" : "Copy Link"}
         </CommitBarButton>
         {canNativeShare && (
           <CommitBarButton variant="primary" onClick={onShare} disabled={!canShare} testId="button-share-commit">

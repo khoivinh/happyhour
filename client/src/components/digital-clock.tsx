@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { GripVertical, Check, ChevronsUpDown, Share, Trash2 } from "lucide-react";
+import { GripVertical, Check, ChevronsUpDown, Share, Trash2, Plus } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -55,6 +55,10 @@ interface DigitalClockProps {
   /** Enters the share flow for this tile's city. Present on grid tiles regardless of
    *  tile count (unlike onRemove), so Share stays reachable even on the last tile. */
   onShare?: (zoneKey: string) => void;
+  /** Sharing View resting state: the tile's ellipsis menu offers a single "Save {city}" item that
+   *  flips the view back into Select Mode with this city checked. Mutually exclusive with the
+   *  board's Share/Delete menu — the Sharing View passes onSave and neither of the others. */
+  onSave?: (zoneKey: string) => void;
   /** Share select-mode: when true the whole tile becomes a selection toggle and its
    *  inner controls (time edit, city picker, reset, ellipsis) go inert. */
   isSelectMode?: boolean;
@@ -242,6 +246,7 @@ export function DigitalClock({
   onTimeUpdate,
   onRemove,
   onShare,
+  onSave,
   isSelectMode = false,
   isSelected = false,
   onToggleSelect,
@@ -711,7 +716,7 @@ export function DigitalClock({
             <EllipsisCircleIcon />
           </button>
         )}
-        {!isSelectMode && !isBeingDragged && onShare && (
+        {!isSelectMode && !isBeingDragged && (onShare || onSave) && (
           <Popover
             open={isMenuOpen}
             onOpenChange={(o) => {
@@ -731,22 +736,41 @@ export function DigitalClock({
               </button>
             </PopoverTrigger>
             <PopoverContent align="end" className="share-tile-menu w-[307px] p-1.5 rounded-[10px]">
-              <button
-                type="button"
-                className="flex w-full items-center gap-3 h-11 px-3 rounded-[7px] text-[15px] font-medium text-popover-foreground hover:bg-muted transition-colors"
-                onClick={() => {
-                  // Reset both the menu's open flag AND isDropdownOpen: flipping into select mode
-                  // unmounts this Popover before Radix fires onOpenChange, which would otherwise
-                  // leave isDropdownOpen stuck true and paint a phantom tint after Cancel.
-                  setIsMenuOpen(false);
-                  setIsDropdownOpen(false);
-                  if (selectedZoneKey) onShare(selectedZoneKey);
-                }}
-                data-testid={`menu-share-${selectedZoneKey}`}
-              >
-                <Share className="h-[18px] w-[18px] shrink-0" />
-                <span className="truncate">Share {shortName}</span>
-              </button>
+              {/* Sharing View resting state: the only item. Selecting it re-enters Select Mode. */}
+              {onSave && (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 h-11 px-3 rounded-[7px] text-[15px] font-medium text-popover-foreground hover:bg-muted transition-colors"
+                  onClick={() => {
+                    // See the note below: unmounting order forces resetting both flags here too.
+                    setIsMenuOpen(false);
+                    setIsDropdownOpen(false);
+                    if (selectedZoneKey) onSave(selectedZoneKey);
+                  }}
+                  data-testid={`menu-save-${selectedZoneKey}`}
+                >
+                  <Plus className="h-[18px] w-[18px] shrink-0" />
+                  <span className="truncate">Save {shortName}</span>
+                </button>
+              )}
+              {onShare && (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 h-11 px-3 rounded-[7px] text-[15px] font-medium text-popover-foreground hover:bg-muted transition-colors"
+                  onClick={() => {
+                    // Reset both the menu's open flag AND isDropdownOpen: flipping into select mode
+                    // unmounts this Popover before Radix fires onOpenChange, which would otherwise
+                    // leave isDropdownOpen stuck true and paint a phantom tint after Cancel.
+                    setIsMenuOpen(false);
+                    setIsDropdownOpen(false);
+                    if (selectedZoneKey) onShare(selectedZoneKey);
+                  }}
+                  data-testid={`menu-share-${selectedZoneKey}`}
+                >
+                  <Share className="h-[18px] w-[18px] shrink-0" />
+                  <span className="truncate">Share {shortName}</span>
+                </button>
+              )}
               {onRemove && (
                 <>
                   <div className="my-1 mx-1 h-px bg-border/70" />

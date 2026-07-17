@@ -57,14 +57,15 @@ test.describe("arriving on a shared link", () => {
     await dismissBanner(page);
 
     await page.goto("/?z=tokyo_JP,newYorkCity_US");
-    await expect(page.getByTestId("text-share-headline")).toHaveText("Two time zones shared with you.");
+    await expect(page.getByTestId("text-share-headline")).toHaveText("Two clocks shared with you.");
     await expect(sharedTiles(page)).toHaveCount(2);
-    await expect(importBar(page)).toContainText("Add these cities to your Happyhour?");
+    await expect(importBar(page)).toContainText("Add these clocks to your Happyhour?");
     // The recipient's own board is not on this surface, and there is no dialog to dismiss.
     await expect(tiles(page)).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    // The params are stripped on load so a refresh never re-prompts.
-    await expect(page).toHaveURL(/\/$/);
+    // The params now PERSIST: the Sharing View is a place the recipient can keep, so a refresh
+    // re-enters it rather than dropping to the board.
+    await expect(page).toHaveURL(/\?z=/);
   });
 
   test("counts in words, and in the singular at one", async ({ page }) => {
@@ -72,7 +73,7 @@ test.describe("arriving on a shared link", () => {
     await dismissBanner(page);
 
     await page.goto("/?z=tokyo_JP");
-    await expect(page.getByTestId("text-share-headline")).toHaveText("One time zone shared with you.");
+    await expect(page.getByTestId("text-share-headline")).toHaveText("One clock shared with you.");
   });
 
   /** Keys are resolved against cities-top.json (500 cities) because it's already in the initial
@@ -86,7 +87,7 @@ test.describe("arriving on a shared link", () => {
 
     await page.goto("/?z=losAngeles_US,newYorkCity_US,heidelberg_DE");
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Three time zones shared with you."
+      "Three clocks shared with you."
     );
     await expect(sharedTiles(page)).toHaveCount(3);
     await expect(page.getByTestId("shared-zone-heidelberg_DE")).toContainText("Heidelberg");
@@ -322,15 +323,21 @@ test.describe("committing", () => {
     await expect(importBar(page)).toHaveCount(0);
   });
 
-  test("Cancel takes nothing and reports the dismissal once", async ({ page }) => {
+  test("Cancel drops to the resting view — it does not take the board or leave", async ({ page }) => {
     await page.addInitScript(seedZones(["chicago_US"]));
     await dismissBanner(page);
 
     await page.goto("/?z=tokyo_JP,paris_FR");
     await page.getByTestId("button-share-import-cancel").click();
 
+    // The bar is gone, but the Sharing View is NOT: the shared clocks stay on screen (that's the
+    // whole point of the round), the recipient's own board never appears, and the URL is untouched.
     await expect(importBar(page)).toHaveCount(0);
-    await expect(tiles(page)).toHaveCount(1);
+    await expect(sharedTiles(page)).toHaveCount(2);
+    await expect(tiles(page)).toHaveCount(0);
+    await expect(page).toHaveURL(/\?z=/);
+    // Resting: every tile now carries the ellipsis "Save" menu instead of a checkbox.
+    await expect(page.getByTestId("button-tile-menu-tokyo_JP")).toBeVisible();
     expect(await trackedEvents(page, "share_link_dismissed")).toEqual([{ count: 2 }]);
     expect(await trackedEvents(page, "share_link_added")).toEqual([]);
   });
@@ -363,6 +370,88 @@ test.describe("a frozen share (&t=)", () => {
     await expect(tiles(page)).toHaveCount(2);
     // The board lands in custom mode holding the same instant, so Reset is offered.
     await expect(page.getByTestId("clock-tile-tokyo_JP")).toContainText("4:00");
+  });
+
+  test("offers Reset Time, which drops the frozen instant", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await dismissBanner(page);
+
+    await page.goto(`/?z=tokyo_JP&t=${FROZEN}`);
+    await expect(page.getByTestId("shared-zone-tokyo_JP")).toContainText("4:00");
+    await expect(page.getByTestId("button-share-reset-time")).toBeVisible();
+
+    await page.getByTestId("button-share-reset-time").click();
+    // The link only shows while a shared instant is frozen, so resetting to live removes it.
+    await expect(page.getByTestId("button-share-reset-time")).toHaveCount(0);
+  });
+
+  test("a live share has no Reset Time link", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await dismissBanner(page);
+
+    await page.goto("/?z=tokyo_JP");
+    await expect(importBar(page)).toBeVisible();
+    await expect(page.getByTestId("button-share-reset-time")).toHaveCount(0);
+  });
+});
+
+/** The round's headline change: the Sharing View is a place the recipient keeps, not a prompt they
+ *  answer once. It survives refresh, Cancel drops it to a resting browse state rather than tearing it
+ *  down, the logo is the way out (with Back restoring it), and a resting tile's Save re-enters the
+ *  pick flow. */
+test.describe("the persistent Sharing View", () => {
+  test("a refresh re-enters the view instead of dropping to the board", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await dismissBanner(page);
+
+    await page.goto("/?z=tokyo_JP,paris_FR");
+    await expect(importBar(page)).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByTestId("text-share-headline")).toBeVisible();
+    await expect(sharedTiles(page)).toHaveCount(2);
+    await expect(tiles(page)).toHaveCount(0);
+  });
+
+  test("the logo links back to the board, and Back restores the view", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await dismissBanner(page);
+
+    await page.goto("/?z=tokyo_JP,paris_FR");
+    // Only here is the logo a link; on the board it's a plain heading.
+    const logoLink = page.locator('header a[href="/"]');
+    await expect(logoLink).toBeVisible();
+    await logoLink.click();
+
+    // A full navigation to the recipient's own board — the Sharing View is gone.
+    await expect(tiles(page)).toHaveCount(1);
+    await expect(page.getByTestId("text-share-headline")).toHaveCount(0);
+
+    // Back reloads the shared URL and re-enters the view with its clocks intact.
+    await page.goBack();
+    await expect(sharedTiles(page)).toHaveCount(2);
+    await expect(page.getByTestId("text-share-headline")).toBeVisible();
+  });
+
+  test("Save on a resting tile re-enters Select Mode with just that city checked", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await dismissBanner(page);
+
+    await page.goto("/?z=tokyo_JP,paris_FR,london_GB");
+    // Drop to resting: the bar goes, the ellipsis menus appear.
+    await page.getByTestId("button-share-import-cancel").click();
+    await expect(importBar(page)).toHaveCount(0);
+
+    await page.getByTestId("button-tile-menu-paris_FR").click();
+    await page.getByTestId("menu-save-paris_FR").click();
+
+    // Back in Select Mode: the bar returns, and ONLY the saved city is pre-checked (not the whole
+    // set, the way arrival pre-checks) — the others reset to unselected.
+    await expect(importBar(page)).toBeVisible();
+    await expect(importBar(page)).toContainText("Add 1");
+    await expect(checkState(page, "paris_FR")).toHaveAttribute("data-state", "selected");
+    await expect(checkState(page, "tokyo_JP")).toHaveAttribute("data-state", "unselected");
+    await expect(checkState(page, "london_GB")).toHaveAttribute("data-state", "unselected");
   });
 });
 

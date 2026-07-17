@@ -76,6 +76,11 @@ interface DigitalClockProps {
    *  anything — it marks the surface as a different mode, and the check carries selection.
    *  (Figma 344:3787 pins every tile to --tile-states/hover.) */
   pinHoverSkin?: boolean;
+  /** Reserve the left grip slot as an invisible placeholder even when the tile isn't draggable or
+   *  in select mode. The Sharing View's resting tiles use this so their content column doesn't
+   *  shift left when the check/select scaffolding drops away — geometry stays identical to Select
+   *  Mode (house rule: preserve layout across similar states). */
+  reserveGripSlot?: boolean;
   isDragActive?: boolean;
   dragHandleListeners?: Record<string, unknown>;
   heroDate?: Date;
@@ -253,6 +258,7 @@ export function DigitalClock({
   isLocked = false,
   isBlocked = false,
   pinHoverSkin = false,
+  reserveGripSlot = false,
   isDragActive = false,
   dragHandleListeners,
   heroDate,
@@ -519,15 +525,17 @@ export function DigitalClock({
             by the tile-wrapper mouse sensor; touch drag is handled by the
             invisible overlay above. In select mode the grip is hidden but its
             slot is kept (invisible) so the row geometry doesn't shift. */}
-        {(isDraggable || isSelectMode) && (
+        {(isDraggable || isSelectMode || reserveGripSlot) && (
           <div
             className={`flex-shrink-0 flex items-start justify-center pt-[12px] pr-1 text-muted-foreground/40 transition-colors ${
-              isSelectMode
+              // Only a real drag handle is interactive; select mode and the Sharing View's resting
+              // tiles keep the slot purely to hold the row's geometry, so they render it invisible.
+              isSelectMode || reserveGripSlot
                 ? "invisible"
                 : "hover:text-muted-foreground cursor-grab active:cursor-grabbing"
             }`}
             title="Drag to reorder"
-            aria-hidden={isSelectMode || undefined}
+            aria-hidden={isSelectMode || reserveGripSlot || undefined}
           >
             <GripVertical className="h-4 w-4" />
           </div>
@@ -736,23 +744,39 @@ export function DigitalClock({
               </button>
             </PopoverTrigger>
             <PopoverContent align="end" className="share-tile-menu w-[307px] p-1.5 rounded-[10px]">
-              {/* Sharing View resting state: the only item. Selecting it re-enters Select Mode. */}
-              {onSave && (
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 h-11 px-3 rounded-[7px] text-[15px] font-medium text-popover-foreground hover:bg-muted transition-colors"
-                  onClick={() => {
-                    // See the note below: unmounting order forces resetting both flags here too.
-                    setIsMenuOpen(false);
-                    setIsDropdownOpen(false);
-                    if (selectedZoneKey) onSave(selectedZoneKey);
-                  }}
-                  data-testid={`menu-save-${selectedZoneKey}`}
-                >
-                  <Plus className="h-[18px] w-[18px] shrink-0" />
-                  <span className="truncate">Save {shortName}</span>
-                </button>
-              )}
+              {/* Sharing View resting state: the only item. A city the recipient already owns can't
+                  be added again, so its item states that fact and is inert — it just closes the menu.
+                  Otherwise "Save {city}" re-enters Select Mode with this city checked. */}
+              {onSave &&
+                (isLocked ? (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 h-11 px-3 rounded-[7px] text-[15px] font-medium text-muted-foreground cursor-default"
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsDropdownOpen(false);
+                    }}
+                    data-testid={`menu-already-saved-${selectedZoneKey}`}
+                  >
+                    <Check className="h-[18px] w-[18px] shrink-0" />
+                    <span className="truncate">Already saved</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 h-11 px-3 rounded-[7px] text-[15px] font-medium text-popover-foreground hover:bg-muted transition-colors"
+                    onClick={() => {
+                      // See the note below: unmounting order forces resetting both flags here too.
+                      setIsMenuOpen(false);
+                      setIsDropdownOpen(false);
+                      if (selectedZoneKey) onSave(selectedZoneKey);
+                    }}
+                    data-testid={`menu-save-${selectedZoneKey}`}
+                  >
+                    <Plus className="h-[18px] w-[18px] shrink-0" />
+                    <span className="truncate">Save {shortName}</span>
+                  </button>
+                ))}
               {onShare && (
                 <button
                   type="button"
@@ -784,7 +808,7 @@ export function DigitalClock({
                     data-testid={`menu-delete-${selectedZoneKey}`}
                   >
                     <Trash2 className="h-[18px] w-[18px] shrink-0" />
-                    <span className="truncate">Delete {shortName}</span>
+                    <span className="truncate">Remove {shortName}</span>
                   </button>
                 </>
               )}

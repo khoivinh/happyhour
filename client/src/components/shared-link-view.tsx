@@ -24,12 +24,16 @@ const NUMBER_WORDS = [
   "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
 ];
 
-/** "Two clocks shared with you." Spelled out because the headline is a sentence, not a stat;
+/** The headline names what the recipient is looking at, and which of the two things it is.
+ *  `live` (a real-time share, or a custom one after Reset Time) describes the clocks as showing the
+ *  current time; otherwise it's a fixed conversion. Spelled out because it's a sentence, not a stat;
  *  past sixteen (more than a board can hold) digits are fine — nobody reads "twenty-three" as prose. */
-function headlineFor(count: number): string {
+function headlineFor(count: number, live: boolean): string {
   const word = NUMBER_WORDS[count] ?? String(count);
-  const capitalized = word.charAt(0).toUpperCase() + word.slice(1);
-  return `${capitalized} clock${count === 1 ? "" : "s"} shared with you.`;
+  const where = count === 1 ? "this location" : `these ${word} locations`;
+  return live
+    ? `Current time in ${where}.`
+    : `Time zone conversion for ${where}.`;
 }
 
 /**
@@ -137,8 +141,10 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
     [owned, room]
   );
 
-  const resetTime = useCallback(() => {
-    setResetToLive(true);
+  /** Flip a custom share between its frozen instant and the live clock. The link label and the
+   *  headline both read off `frozen`, so one toggle drives all three. */
+  const toggleTime = useCallback(() => {
+    setResetToLive((v) => !v);
     setNow(new Date()); // catch up immediately rather than waiting out the first interval
   }, []);
 
@@ -163,25 +169,32 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
               className="w-full font-display font-black text-foreground text-[36px] leading-[38px] tracking-[-1px]"
               data-testid="text-share-headline"
             >
-              {headlineFor(keys.length)}
+              {headlineFor(keys.length, !frozen)}
             </h2>
           </div>
         </div>
 
-        {/* Reset Time — only while a shared instant is frozen. Right-aligned above the first tile,
-            styled to match the hero's own reset link (digital-clock.tsx). */}
-        {frozen && (
+        {/* Reset Time — custom shares only. The slot is reserved whenever there's a frozen instant
+            to toggle (t != null), so the grid never jumps; the link itself hides in Select Mode and
+            appears once the recipient drops to Resting via Cancel. Its label toggles with the state:
+            "Reset Time" while frozen, "Restore Custom Time" once switched to live. Right-aligned above
+            the first tile, styled to match the hero's own reset link (digital-clock.tsx). */}
+        {t != null && (
           <div
             className={`flex justify-end px-[10px] pb-[10px] transition-opacity duration-200 motion-reduce:transition-none ${
               retiring ? "opacity-0" : "opacity-100"
             }`}
           >
             <button
-              onClick={resetTime}
-              className="font-semibold text-sm uppercase text-[#4e82ee] px-2.5 py-[3px] cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={toggleTime}
+              className={`font-semibold text-sm uppercase text-[#4e82ee] px-2.5 py-[3px] cursor-pointer hover:opacity-80 transition-opacity ${
+                inSelect ? "invisible" : ""
+              }`}
+              aria-hidden={inSelect || undefined}
+              tabIndex={inSelect ? -1 : undefined}
               data-testid="button-share-reset-time"
             >
-              Reset Time
+              {frozen ? "Reset Time" : "Restore Custom Time"}
             </button>
           </div>
         )}
@@ -206,6 +219,7 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
                   use24Hour={use24Hour}
                   isSelectMode={inSelect}
                   pinHoverSkin={inSelect}
+                  reserveGripSlot
                   isLocked={isLocked}
                   isBlocked={!isLocked && !selected.has(key) && selected.size >= room}
                   isSelected={selected.has(key)}

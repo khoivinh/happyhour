@@ -18,6 +18,7 @@ docs/HANDOFF.md
 .agents/
 chat/
 design/
+.wrangler/
 api/.wrangler/
 api/api
 

@@ -19,6 +19,10 @@ function Router() {
   const [location] = useLocation();
   useEffect(() => {
     trackPageView(location);
+    // wouter swaps the route in place and leaves scroll where it was, so navigating from the
+    // bottom of the tall home page (e.g. the footer's "access your location" link) would land
+    // /support scrolled near its own footer. Reset to the top on every route change.
+    window.scrollTo(0, 0);
   }, [location]);
 
   return (

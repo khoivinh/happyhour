@@ -57,7 +57,10 @@ test.describe("arriving on a shared link", () => {
     await dismissBanner(page);
 
     await page.goto("/?z=tokyo_JP,newYorkCity_US");
-    await expect(page.getByTestId("text-share-headline")).toHaveText("Two clocks shared with you.");
+    // A live share (no &t=) describes the clocks as showing the current time.
+    await expect(page.getByTestId("text-share-headline")).toHaveText(
+      "Current time in these two locations."
+    );
     await expect(sharedTiles(page)).toHaveCount(2);
     await expect(importBar(page)).toContainText("Add these clocks to your Happyhour?");
     // The recipient's own board is not on this surface, and there is no dialog to dismiss.
@@ -73,7 +76,9 @@ test.describe("arriving on a shared link", () => {
     await dismissBanner(page);
 
     await page.goto("/?z=tokyo_JP");
-    await expect(page.getByTestId("text-share-headline")).toHaveText("One clock shared with you.");
+    await expect(page.getByTestId("text-share-headline")).toHaveText(
+      "Current time in this location."
+    );
   });
 
   /** Keys are resolved against cities-top.json (500 cities) because it's already in the initial
@@ -87,7 +92,7 @@ test.describe("arriving on a shared link", () => {
 
     await page.goto("/?z=losAngeles_US,newYorkCity_US,heidelberg_DE");
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Three clocks shared with you."
+      "Current time in these three locations."
     );
     await expect(sharedTiles(page)).toHaveCount(3);
     await expect(page.getByTestId("shared-zone-heidelberg_DE")).toContainText("Heidelberg");
@@ -372,17 +377,42 @@ test.describe("a frozen share (&t=)", () => {
     await expect(page.getByTestId("clock-tile-tokyo_JP")).toContainText("4:00");
   });
 
-  test("offers Reset Time, which drops the frozen instant", async ({ page }) => {
+  test("Reset Time is hidden until Cancel, then toggles frozen ↔ live", async ({ page }) => {
     await page.addInitScript(seedZones(["chicago_US"]));
     await dismissBanner(page);
 
     await page.goto(`/?z=tokyo_JP&t=${FROZEN}`);
+    // A custom-time share reads as a conversion, and the frozen instant shows (Tokyo 04:00).
+    await expect(page.getByTestId("text-share-headline")).toHaveText(
+      "Time zone conversion for this location."
+    );
     await expect(page.getByTestId("shared-zone-tokyo_JP")).toContainText("4:00");
-    await expect(page.getByTestId("button-share-reset-time")).toBeVisible();
+    // In Select Mode the link's slot is reserved but the link itself is hidden — there's no
+    // resetting a board you haven't accepted yet.
+    await expect(page.getByTestId("button-share-reset-time")).toBeHidden();
 
-    await page.getByTestId("button-share-reset-time").click();
-    // The link only shows while a shared instant is frozen, so resetting to live removes it.
-    await expect(page.getByTestId("button-share-reset-time")).toHaveCount(0);
+    // Cancel drops to resting, where the link appears.
+    await page.getByTestId("button-share-import-cancel").click();
+    const resetLink = page.getByTestId("button-share-reset-time");
+    await expect(resetLink).toBeVisible();
+    await expect(resetLink).toHaveText("Reset Time");
+
+    // Reset switches to live: the headline flips to current-time wording and the link becomes the
+    // way back. (The clock value isn't asserted here — the live instant depends on the run clock;
+    // the headline is driven by the same frozen flag, so its flip proves the tiles went live.)
+    await resetLink.click();
+    await expect(resetLink).toHaveText("Restore Custom Time");
+    await expect(page.getByTestId("text-share-headline")).toHaveText(
+      "Current time in this location."
+    );
+
+    // Restore brings the frozen instant back, verbatim.
+    await resetLink.click();
+    await expect(resetLink).toHaveText("Reset Time");
+    await expect(page.getByTestId("text-share-headline")).toHaveText(
+      "Time zone conversion for this location."
+    );
+    await expect(page.getByTestId("shared-zone-tokyo_JP")).toContainText("4:00");
   });
 
   test("a live share has no Reset Time link", async ({ page }) => {
@@ -452,6 +482,47 @@ test.describe("the persistent Sharing View", () => {
     await expect(checkState(page, "paris_FR")).toHaveAttribute("data-state", "selected");
     await expect(checkState(page, "tokyo_JP")).toHaveAttribute("data-state", "unselected");
     await expect(checkState(page, "london_GB")).toHaveAttribute("data-state", "unselected");
+  });
+
+  test("an already-owned city's resting menu says so and is inert", async ({ page }) => {
+    await page.addInitScript(seedZones(["tokyo_JP", "chicago_US"]));
+    await dismissBanner(page);
+
+    await page.goto("/?z=tokyo_JP,paris_FR");
+    await page.getByTestId("button-share-import-cancel").click();
+    await expect(importBar(page)).toHaveCount(0);
+
+    // Tokyo is already on the board, so its menu offers a non-functional "Already saved", not "Save".
+    await page.getByTestId("button-tile-menu-tokyo_JP").click();
+    await expect(page.getByTestId("menu-already-saved-tokyo_JP")).toBeVisible();
+    await expect(page.getByTestId("menu-save-tokyo_JP")).toHaveCount(0);
+    // Clicking it only dismisses the menu — it does NOT re-enter Select Mode.
+    await page.getByTestId("menu-already-saved-tokyo_JP").click();
+    await expect(page.getByTestId("menu-already-saved-tokyo_JP")).toHaveCount(0);
+    await expect(importBar(page)).toHaveCount(0);
+
+    // Paris (not owned) still offers the real Save.
+    await page.getByTestId("button-tile-menu-paris_FR").click();
+    await expect(page.getByTestId("menu-save-paris_FR")).toBeVisible();
+  });
+
+  test("dropping to resting does not shift the tile content", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await dismissBanner(page);
+
+    await page.goto("/?z=tokyo_JP,paris_FR");
+    // The city name's left edge in Select Mode…
+    const cityName = page.getByTestId("shared-zone-tokyo_JP").locator("p").first();
+    await expect(cityName).toBeVisible();
+    const selectX = (await cityName.boundingBox())!.x;
+
+    // …must be identical after Cancel drops to resting. The grip slot is reserved in both states, so
+    // the content column can't slide left (house rule: preserve layout across similar states).
+    await page.getByTestId("button-share-import-cancel").click();
+    await expect(importBar(page)).toHaveCount(0);
+    const restingX = (await cityName.boundingBox())!.x;
+
+    expect(Math.abs(restingX - selectX)).toBeLessThanOrEqual(1);
   });
 });
 

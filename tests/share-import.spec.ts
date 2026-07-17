@@ -59,7 +59,7 @@ test.describe("arriving on a shared link", () => {
     await page.goto("/?z=tokyo_JP,newYorkCity_US");
     // A live share (no &t=) describes the clocks as showing the current time.
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Here's the current time in these two cities."
+      "Current time in these two cities."
     );
     await expect(sharedTiles(page)).toHaveCount(2);
     await expect(importBar(page)).toContainText("Add these clocks to your Happyhour?");
@@ -77,7 +77,7 @@ test.describe("arriving on a shared link", () => {
 
     await page.goto("/?z=tokyo_JP");
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Here's the current time in this city."
+      "Current time in this city."
     );
   });
 
@@ -92,7 +92,7 @@ test.describe("arriving on a shared link", () => {
 
     await page.goto("/?z=losAngeles_US,newYorkCity_US,heidelberg_DE");
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Here's the current time in these three cities."
+      "Current time in these three cities."
     );
     await expect(sharedTiles(page)).toHaveCount(3);
     await expect(page.getByTestId("shared-zone-heidelberg_DE")).toContainText("Heidelberg");
@@ -405,7 +405,7 @@ test.describe("a frozen share (&t=)", () => {
     await page.goto(`/?z=tokyo_JP&t=${FROZEN}`);
     // A custom-time share reads as a conversion, and the frozen instant shows (Tokyo 04:00).
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Here's the time zone conversion for this city."
+      "Time zone conversion for this city."
     );
     await expect(page.getByTestId("shared-zone-tokyo_JP")).toContainText("4:00");
     // In Select Mode the link's slot is reserved but the link itself is hidden — there's no
@@ -424,14 +424,14 @@ test.describe("a frozen share (&t=)", () => {
     await resetLink.click();
     await expect(resetLink).toHaveText("Restore Custom Time");
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Here's the current time in this city."
+      "Current time in this city."
     );
 
     // Restore brings the frozen instant back, verbatim.
     await resetLink.click();
     await expect(resetLink).toHaveText("Reset Time");
     await expect(page.getByTestId("text-share-headline")).toHaveText(
-      "Here's the time zone conversion for this city."
+      "Time zone conversion for this city."
     );
     await expect(page.getByTestId("shared-zone-tokyo_JP")).toContainText("4:00");
   });

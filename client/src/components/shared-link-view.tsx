@@ -32,8 +32,8 @@ function headlineFor(count: number, live: boolean): string {
   const word = NUMBER_WORDS[count] ?? String(count);
   const where = count === 1 ? "this city" : `these ${word} cities`;
   return live
-    ? `Here's the current time in ${where}.`
-    : `Here's the time zone conversion for ${where}.`;
+    ? `Current time in ${where}.`
+    : `Time zone conversion for ${where}.`;
 }
 
 /**
@@ -176,8 +176,8 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
         >
           <div className="min-h-0 overflow-hidden px-[10px] pb-[32px]">
             {/* Same type and width as the onboarding tagline (sm:w-3/5, ~60% on desktop) so the two
-                headlines share a column measure. These sentences ("Here's the current time in these
-                N cities.") run long enough to want the constrained width; below sm it goes full. */}
+                headlines share a column measure. These sentences ("Current time in these N cities.")
+                run long enough to want the constrained width; below sm it goes full. */}
             <h2
               className="w-full sm:w-3/5 font-display font-black text-foreground text-[36px] leading-[38px] tracking-[-1px]"
               data-testid="text-share-headline"

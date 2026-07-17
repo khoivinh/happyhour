@@ -26,10 +26,10 @@ the tagline **replaces** "About" (the word no longer appears on the page); the s
 - **Headline width.** The headline `<h2>` went `w-full` → `w-full sm:w-3/5`, matching the onboarding
   tagline (~60% on desktop). The round-4 comment justified full-width because the old sentence was
   short and one-line; the new, longer sentences want the constrained measure. Comment updated.
-- **Headline wording.** `headlineFor` now reads **"Here's the current time in these N cities."** (live)
-  / **"Here's the time zone conversion for these N cities."** (custom), singular **"…in this city."**.
-  Switched "locations" → "cities" and added the "Here's the" lead-in. Still driven by the same `frozen`
-  flag, so Reset ↔ Restore swaps the sentence for free.
+- **Headline wording.** `headlineFor` now reads **"Current time in these N cities."** (live) /
+  **"Time zone conversion for these N cities."** (custom), singular **"…in this city."**. Switched
+  "locations" → "cities". Still driven by the same `frozen` flag, so Reset ↔ Restore swaps the
+  sentence for free. (Briefly shipped with a "Here's the" lead-in, then reverted the same day.)
 - **Skip Select Mode when there's nothing to add** (added mid-session). If the recipient already owns
   *every* shared city (`newKeys.length === 0`), the view now lands directly in **Resting** instead of
   opening Select Mode with an empty, disabled Commit Bar. Done in the `mode` `useState` lazy

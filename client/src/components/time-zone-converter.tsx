@@ -100,6 +100,9 @@ interface TimeZoneConverterProps {
    *  once when a shared link is accepted. The local highlight (adding one city by hand) stays
    *  separate: it's a different event that happens to reuse the same animation. */
   highlightedZones?: string[];
+  /** Fired on a real manual add (not a duplicate or a cap-hit). The page uses it to raise the
+   *  account Registration Bar; the add itself flows through onZonesChange as before. */
+  onClockAdded?: () => void;
 }
 
 interface SortableClockItemProps {
@@ -279,7 +282,7 @@ export function initZonesFromStorage(): string[] {
   return DEFAULT_ZONES;
 }
 
-export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, selectedZones, onZonesChange, onGeoDeniedChange, onShareModeChange, highlightedZones }: TimeZoneConverterProps) {
+export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, selectedZones, onZonesChange, onGeoDeniedChange, onShareModeChange, highlightedZones, onClockAdded }: TimeZoneConverterProps) {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [heroZone, setHeroZone] = useState<string>("london_GB");
   const [newlyAddedZone, setNewlyAddedZone] = useState<string | null>(null);
@@ -569,6 +572,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     onZonesChange((prev: string[]) => [zoneKey, ...prev]);
     setNewlyAddedZone(zoneKey);
     track("city_added", { city_key: zoneKey });
+    onClockAdded?.();
 
     // First-ever add dismisses the onboarding tagline, once and for all.
     if (!onboarded) {
@@ -583,7 +587,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     setTimeout(() => {
       setNewlyAddedZone(null);
     }, 1500);
-  }, [selectedZones, onZonesChange, sortEastToWest, onSortEastToWestChange, onboarded]);
+  }, [selectedZones, onZonesChange, sortEastToWest, onSortEastToWestChange, onboarded, onClockAdded]);
 
   // Unmount the tagline only after the height collapse finishes (the opacity
   // fade transitionend fires first and must be ignored).

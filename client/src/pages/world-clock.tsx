@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { TimeZoneConverter } from "@/components/time-zone-converter";
 import { SharedLinkView } from "@/components/shared-link-view";
+import { RegistrationBar } from "@/components/registration-bar";
 import { Sidebar, DrawerToggleIcon } from "@/components/sidebar";
 import { getCityByKey, loadCities, loadTopCities } from "@/lib/city-lookup";
 import { useCloudSync } from "@/hooks/use-cloud-sync";
@@ -29,6 +30,11 @@ const SCROLL_RANGE = 120;
 // independently of the toggle — raising this value is the only way to push the panel further from
 // the top of the viewport. At 32 the panel's top edge sits at 14px.
 const TOGGLE_TOP = 32;
+
+// Clerk only mounts when a publishable key is compiled in (the test/CI build omits it on purpose),
+// so gate anything that calls a Clerk hook — like the Registration Bar — on this. Same const the
+// sidebar and use-cloud-sync use to avoid calling Clerk hooks without a provider.
+const isClerkConfigured = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 const USE_24H_KEY = "world-happyhour-24h";
 const SORT_ETW_KEY = "world-happyhour-sort-etw";
@@ -85,6 +91,11 @@ export default function WorldClock() {
   // Cities to flash on arrival, handed to the board when the Sharing View retires. Cleared once
   // the animation has had time to play; it's a one-shot, not a lasting property of the tiles.
   const [highlightedZones, setHighlightedZones] = useState<string[]>([]);
+  // Account Registration Bar, both in-memory by design (Khoi, 2026-07-18): it appears only once
+  // the visitor has added a clock *this session* — a returning signed-out user who adds nothing
+  // won't see it — and Cancel hides it for the session, not for good.
+  const [addedThisSession, setAddedThisSession] = useState(false);
+  const [regDismissed, setRegDismissed] = useState(false);
   // A shared link's *keys* resolve asynchronously (they need the city lookup loaded), but whether
   // the URL carries ?z= at all is knowable synchronously — so the board is held back until we
   // know. Otherwise the recipient's own clocks mount and paint for a frame before the Sharing View
@@ -243,6 +254,9 @@ export default function WorldClock() {
 
     setSelectedZones(merged.slice(0, MAX_CLOCKS));
     setHighlightedZones(added);
+    // Accepting shared clocks counts as adding this session, so the recipient lands on the board
+    // with the Registration Bar up — but only if they actually took something new.
+    if (added.length > 0) setAddedThisSession(true);
     if (shareImport.t != null) {
       setSelectedTime(new Date(shareImport.t));
       setIsCustomMode(true);
@@ -413,10 +427,19 @@ export default function WorldClock() {
               onGeoDeniedChange={setGeoDenied}
               onShareModeChange={setShareActive}
               highlightedZones={highlightedZones}
+              onClockAdded={() => setAddedThisSession(true)}
             />
           )}
         </div>
       </div>
+
+      {/* Account onboarding nudge. A sibling of the view conditional so it rides over the board but
+          never a share flow (its own CommitBar owns the bottom then). Gated on isClerkConfigured so
+          RegistrationBar's useAuth() only runs with a provider; the mutually-exclusive conditions
+          keep exactly one bottom bar mounted, so the footer clearance never doubles. */}
+      {isClerkConfigured && addedThisSession && !regDismissed && !shareActive && !shareImport && (
+        <RegistrationBar onDismiss={() => setRegDismissed(true)} />
+      )}
 
       <SiteFooter geoDenied={geoDenied} />
     </main>

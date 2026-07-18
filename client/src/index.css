@@ -211,6 +211,20 @@
   --share-bar-subtle: rgba(0, 0, 0, 0.16);
 }
 
+/* Account Registration Bar — deliberately blue in every theme, not the per-theme share skin.
+   It reuses CommitBar wholesale by overriding the same --share-bar-* vars on a wrapper: blue
+   surface, white copy, and a white/blue "Login or Sign Up" pill (accent inverted from the share
+   bar). #4e82ee matches the sidebar's Login button so the two read as one account affordance. */
+.registration-bar {
+  --share-bar-bg: #4e82ee;
+  --share-bar-fg: #ffffff;
+  --share-bar-accent: #ffffff; /* submit background */
+  --share-bar-accent-fg: #4e82ee; /* submit text */
+  --share-bar-muted: rgba(255, 255, 255, 0.85); /* Cancel label */
+  --share-bar-border: transparent;
+  --share-bar-subtle: rgba(255, 255, 255, 0.16);
+}
+
 @layer base {
   /* The hero clock changes height as you scroll (209px → 115px). Chrome and Firefox respond with
      scroll anchoring: they nudge scrollTop to keep the content *below* the shrinking element

@@ -81,6 +81,11 @@ interface DigitalClockProps {
    *  shift left when the check/select scaffolding drops away — geometry stays identical to Select
    *  Mode (house rule: preserve layout across similar states). */
   reserveGripSlot?: boolean;
+  /** Select-mode variant: keep the check slot's geometry but paint no check. The signed-out Sharing
+   *  View shows the tiles as a display-only preview (register to keep them all), so there's nothing
+   *  to select — the check would imply a choice that isn't offered. Layout is unchanged; only the
+   *  17×17 mark is hidden. Defaults true so every existing caller is untouched. */
+  showSelectCheck?: boolean;
   isDragActive?: boolean;
   dragHandleListeners?: Record<string, unknown>;
   heroDate?: Date;
@@ -259,6 +264,7 @@ export function DigitalClock({
   isBlocked = false,
   pinHoverSkin = false,
   reserveGripSlot = false,
+  showSelectCheck = true,
   isDragActive = false,
   dragHandleListeners,
   heroDate,
@@ -489,8 +495,10 @@ export function DigitalClock({
     >
       {/* Share select-mode: a full-tile tap layer toggles inclusion and makes the tile's
           inner controls inert. The check indicator itself lives in the ellipsis's flow slot
-          (below) so the tile geometry is identical to normal mode. */}
-      {isSelectMode && !isLocked && (
+          (below) so the tile geometry is identical to normal mode. Gated on onToggleSelect so the
+          register-mode preview (signed-out Sharing View — display-only, no toggle) doesn't lay a
+          dead, focusable button over every tile. */}
+      {isSelectMode && !isLocked && onToggleSelect && (
         <button
           type="button"
           className="absolute inset-0 z-20 rounded-[15px]"
@@ -701,7 +709,9 @@ export function DigitalClock({
                     ? "bg-foreground text-background"
                     : isBlocked
                       ? "border-[1.5px] border-foreground/15"
-                      : "border-[1.5px] border-foreground/40"
+                      : "border-[1.5px] border-foreground/40",
+                // Keep the 17×17 box (no row shift), paint nothing — the register-mode preview.
+                !showSelectCheck && "invisible"
               )}
               data-state={
                 isLocked ? "locked" : isSelected ? "selected" : isBlocked ? "blocked" : "unselected"

@@ -44,7 +44,7 @@ export function RegistrationBar({ onDismiss }: { onDismiss: () => void }) {
             }}
             testId="button-registration-cancel"
           >
-            Cancel
+            Later
           </CommitBarButton>
           {/* SignInButton clones its child and *composes* the click — it runs the child's own
               onClick, then opens the modal — so this track() fires before sign-in opens. Same

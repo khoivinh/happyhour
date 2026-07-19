@@ -266,20 +266,17 @@ function migrateOldKeys(keys: string[]): string[] {
   return migrated.filter(key => getCityByKey(key) !== undefined);
 }
 
-const DEFAULT_ZONES = ["tokyo_JP", "newYorkCity_US", "paris_FR"];
-
+// New visitors start with an empty board — pre-seeding cities they never asked for is disorienting
+// (2026-07-19). An empty stored array is honored as-is (no re-seeding), so a user who removes every
+// clock stays at zero rather than silently getting defaults back on the next load.
 export function initZonesFromStorage(): string[] {
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      const migrated = migrateOldKeys(parsed);
-      return migrated.length > 0 ? migrated : DEFAULT_ZONES;
-    } catch {
-      return DEFAULT_ZONES;
-    }
+  if (!stored) return [];
+  try {
+    return migrateOldKeys(JSON.parse(stored));
+  } catch {
+    return [];
   }
-  return DEFAULT_ZONES;
 }
 
 export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, selectedZones, onZonesChange, onGeoDeniedChange, onShareModeChange, highlightedZones, onClockAdded }: TimeZoneConverterProps) {
@@ -785,7 +782,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
           >
             <div className="min-h-0 overflow-hidden px-[10px] pb-[32px]">
               <h2 className="w-full sm:w-3/5 font-display font-black text-foreground text-[36px] leading-[38px] tracking-[-1px]">
-                Welcome to the indispensable time zone tool.
+                Track clocks and convert time zones for up to sixteen cities
               </h2>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DigitalClock } from "@/components/digital-clock";
 import { CommitBar, CommitBarActions, CommitBarButton } from "@/components/commit-bar";
+import { RegistrationBar } from "@/components/registration-bar";
 import { MAX_CLOCKS } from "@/components/time-zone-converter";
 import { getCityByKey, formatCityDisplay, getTimeInCityZone } from "@/lib/city-lookup";
 
@@ -17,6 +18,11 @@ interface SharedLinkViewProps {
   /** The recipient dismissed the Commit Bar (Select Mode → Resting). Analytics only — the view
    *  stays mounted; escaping the Sharing View is the logo's job, not Cancel's. */
   onDismiss?: () => void;
+  /** Signed-out recipient (Clerk-only path, set by SharedLinkAuthController): show the blue
+   *  Registration Bar instead of the Commit Bar, and render the tiles as a checkless, display-only
+   *  preview — there's no per-city choice to make, registering keeps them all. When false (the
+   *  default, and always so in the no-Clerk test build) this is the unchanged Commit-Bar view. */
+  registerMode?: boolean;
 }
 
 const NUMBER_WORDS = [
@@ -51,7 +57,7 @@ function headlineFor(count: number, live: boolean): string {
  * Cancel drops from Select Mode to Resting; it never tears the view down. The clocks tick in real
  * time, except a shared instant (&t=) freezes them until the recipient hits Reset Time.
  */
-export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss }: SharedLinkViewProps) {
+export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss, registerMode = false }: SharedLinkViewProps) {
   const owned = useMemo(() => new Set(ownedKeys), [ownedKeys]);
   /** How many of the shared cities the board can still take. Cities the recipient already has
    *  cost nothing — they're not being added. */
@@ -68,6 +74,18 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
   const [selected, setSelected] = useState<Set<string>>(() => new Set(newKeys.slice(0, room)));
   const [retiring, setRetiring] = useState(false);
   const pending = useRef<string[] | null>(null);
+  // "Later" hides the register-mode bar, leaving the clocks on view (the logo is the escape).
+  const [registerDismissed, setRegisterDismissed] = useState(false);
+  // A returning user who signs in from the share view flips registerMode true→false and the Commit
+  // Bar takes over. Re-derive the pre-check against the now-known owned board — cloud-sync fills
+  // ownedKeys in after login — so owned cities land locked and only genuinely-new ones start checked.
+  const wasRegisterMode = useRef(registerMode);
+  useEffect(() => {
+    if (wasRegisterMode.current && !registerMode) {
+      setSelected(new Set(newKeys.slice(0, room)));
+    }
+    wasRegisterMode.current = registerMode;
+  }, [registerMode, newKeys, room]);
 
   // The view persists now, so the tiles keep their own time. A live share ticks each minute; a
   // shared instant (&t=) stays frozen until the recipient chooses Reset Time.
@@ -230,14 +248,15 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
                   selectedZoneKey={key}
                   zoneKey={key}
                   use24Hour={use24Hour}
-                  isSelectMode={inSelect}
-                  pinHoverSkin={inSelect}
+                  isSelectMode={registerMode || inSelect}
+                  pinHoverSkin={registerMode || inSelect}
                   reserveGripSlot
+                  showSelectCheck={!registerMode}
                   isLocked={isLocked}
                   isBlocked={!isLocked && !selected.has(key) && selected.size >= room}
                   isSelected={selected.has(key)}
-                  onToggleSelect={toggle}
-                  onSave={saveFromRest}
+                  onToggleSelect={registerMode ? undefined : toggle}
+                  onSave={registerMode ? undefined : saveFromRest}
                 />
               </div>
             );
@@ -245,26 +264,34 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
         </div>
       </section>
 
-      {inSelect && !retiring && (
-        <CommitBar testId="share-import-bar">
-          <p className="text-sm font-medium text-[var(--share-bar-fg)]" data-testid="text-share-import-prompt">
-            {prompt}
-          </p>
-          <CommitBarActions>
-            <CommitBarButton variant="ghost" onClick={dismissBar} testId="button-share-import-cancel">
-              Cancel
-            </CommitBarButton>
-            <CommitBarButton
-              variant="primary"
-              onClick={handleAdd}
-              disabled={selected.size === 0}
-              testId="button-share-import-add"
-            >
-              {selected.size > 0 ? `Add ${selected.size}` : "Add"}
-            </CommitBarButton>
-          </CommitBarActions>
-        </CommitBar>
-      )}
+      {/* Signed-out recipient: the blue Registration Bar stands in for the Commit Bar — there's no
+          per-city choice, registering keeps them all (the auth edge in SharedLinkAuthController does
+          the add). "Later" hides it, leaving the clocks on view. The no-Clerk test build never sets
+          registerMode, so it always renders the Commit Bar below. */}
+      {registerMode
+        ? !registerDismissed && !retiring && (
+            <RegistrationBar onDismiss={() => setRegisterDismissed(true)} />
+          )
+        : inSelect && !retiring && (
+            <CommitBar testId="share-import-bar">
+              <p className="text-sm font-medium text-[var(--share-bar-fg)]" data-testid="text-share-import-prompt">
+                {prompt}
+              </p>
+              <CommitBarActions>
+                <CommitBarButton variant="ghost" onClick={dismissBar} testId="button-share-import-cancel">
+                  Cancel
+                </CommitBarButton>
+                <CommitBarButton
+                  variant="primary"
+                  onClick={handleAdd}
+                  disabled={selected.size === 0}
+                  testId="button-share-import-add"
+                >
+                  {selected.size > 0 ? `Add ${selected.size}` : "Add"}
+                </CommitBarButton>
+              </CommitBarActions>
+            </CommitBar>
+          )}
     </>
   );
 }

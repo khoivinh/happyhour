@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { TimeZoneConverter } from "@/components/time-zone-converter";
 import { SharedLinkView } from "@/components/shared-link-view";
+import { SharedLinkAuthController } from "@/components/shared-link-auth-controller";
 import { RegistrationBar } from "@/components/registration-bar";
 import { Sidebar, DrawerToggleIcon } from "@/components/sidebar";
 import { getCityByKey, loadCities, loadTopCities } from "@/lib/city-lookup";
@@ -177,14 +178,17 @@ export default function WorldClock() {
     track("custom_time_reset");
   }
 
-  // Parse an incoming shared link on load: read ?z= / ?t=, then resolve the keys AFTER the city
-  // lookup is loaded (it loads async, and getCityByKey returns undefined before then — resolving
-  // too early would silently drop every shared city). The params are kept in the URL on purpose:
-  // the Sharing View is a place the recipient can keep, so a refresh re-enters it rather than
-  // dropping to the board. handleAddShared clears the URL once the share is consumed.
-  useEffect(() => {
-    // Every exit path must land here, or a link that resolves to nothing would leave the board
-    // held back forever on a blank page.
+  // Latest share-resolve wins: a stale async resolution (e.g. a rapid Back/Forward) must not write
+  // over a newer one. Bumped each call; only the matching token may commit.
+  const shareResolveToken = useRef(0);
+
+  /** Read ?z= / ?t= from the *current* URL and enter or leave the Sharing View accordingly. Keys
+   *  resolve AFTER the city lookup is loaded (it loads async, and getCityByKey returns undefined
+   *  before then — resolving too early would silently drop every shared city). Called on mount and
+   *  again on every popstate, so browser Back/Forward across the share↔board boundary re-resolves. */
+  const resolveShareFromLocation = useCallback(() => {
+    // Every exit path must settle sharePending, or a link that resolves to nothing would leave the
+    // board held back forever on a blank page.
     const settled = () => setSharePending(false);
     let rawKeys: string | null = null;
     let rawT: string | null = null;
@@ -193,22 +197,26 @@ export default function WorldClock() {
       rawKeys = params.get("z");
       rawT = params.get("t");
     } catch {
+      setShareImport(null);
       settled();
       return;
     }
+    // No share in the URL — e.g. Back to the board after adding, or Forward past a consumed share.
     if (!rawKeys) {
+      setShareImport(null);
       settled();
       return;
     }
     const candidates = rawKeys.split(",").map((k) => k.trim()).filter(Boolean);
     if (candidates.length === 0) {
+      setShareImport(null);
       settled();
       return;
     }
     const tNum = rawT ? Number(rawT) : NaN;
     const t = Number.isFinite(tNum) ? tNum : null;
 
-    let cancelled = false;
+    const token = ++shareResolveToken.current;
     // The top tier is 500 cities; the full set is 30k. A sender can share any of them, so resolving
     // against the top tier alone silently dropped 98% of the map — and the headline then counted the
     // survivors and stated the wrong number with total confidence. Try the cheap tier first (most
@@ -218,24 +226,35 @@ export default function WorldClock() {
     // so both derive the same key for the same city — which is what makes this fallback safe.
     loadTopCities()
       .then(() => {
-        if (cancelled || candidates.every((k) => getCityByKey(k))) return;
+        if (token !== shareResolveToken.current || candidates.every((k) => getCityByKey(k))) return;
         // A failed full load is not fatal: fall through and show whatever the top tier resolved.
         return loadCities().catch(() => undefined);
       })
       .then(() => {
-        if (cancelled) return;
+        if (token !== shareResolveToken.current) return;
         const keys = candidates.filter((k) => getCityByKey(k));
         if (keys.length > 0) {
           setShareImport({ keys, t });
           track("share_link_opened", { count: keys.length });
+        } else {
+          setShareImport(null);
         }
         // Batched with setShareImport above, so the board and the Sharing View never both render.
         settled();
       });
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    resolveShareFromLocation();
+  }, [resolveShareFromLocation]);
+
+  // Browser Back/Forward across the share→board boundary. handleAddShared pushes a clean URL on top
+  // of the ?z= entry, so Back restores the share URL here — re-resolve it as a pure SPA transition
+  // (no reload). wouter ignores the query string, so it won't fight this.
+  useEffect(() => {
+    window.addEventListener("popstate", resolveShareFromLocation);
+    return () => window.removeEventListener("popstate", resolveShareFromLocation);
+  }, [resolveShareFromLocation]);
 
   /** Merge the cities the recipient chose in the Sharing View.
    *
@@ -270,10 +289,11 @@ export default function WorldClock() {
       capped: shareImport.keys.filter((k) => !selectedZones.includes(k)).length > MAX_CLOCKS - selectedZones.length,
     });
     setShareImport(null);
-    // The share is consumed — drop ?z=/?t= so a later refresh shows the board, not the view again.
-    // replaceState, not push: adding clocks isn't a place to Back into (unlike the logo escape).
+    // Push a clean URL *on top of* the ?z= entry (rather than replacing it), so the browser Back
+    // button returns to the Sharing View — the popstate listener re-resolves the restored URL. A
+    // later refresh on the clean URL still shows the board, since ?z=/?t= are no longer current.
     try {
-      window.history.replaceState(null, "", window.location.pathname);
+      window.history.pushState(null, "", window.location.pathname);
     } catch {
       /* history blocked — the added clocks still stand; a refresh would just re-enter the view */
     }
@@ -404,14 +424,28 @@ export default function WorldClock() {
       <div className="flex-1 px-6 pt-0 pb-8 md:px-12 lg:px-24">
         <div className="mx-auto max-w-4xl">
           {shareImport ? (
-            <SharedLinkView
-              keys={shareImport.keys}
-              t={shareImport.t}
-              ownedKeys={selectedZones}
-              use24Hour={use24Hour}
-              onAdd={handleAddShared}
-              onDismiss={handleShareBarDismissed}
-            />
+            // Clerk-configured builds route through the auth controller (register vs commit mode,
+            // new-registrant auto-add). The no-Clerk test/CI build renders the plain view in its
+            // unchanged Commit-Bar mode, so no Clerk hook ever runs without a provider.
+            isClerkConfigured ? (
+              <SharedLinkAuthController
+                keys={shareImport.keys}
+                t={shareImport.t}
+                ownedKeys={selectedZones}
+                use24Hour={use24Hour}
+                onAdd={handleAddShared}
+                onDismiss={handleShareBarDismissed}
+              />
+            ) : (
+              <SharedLinkView
+                keys={shareImport.keys}
+                t={shareImport.t}
+                ownedKeys={selectedZones}
+                use24Hour={use24Hour}
+                onAdd={handleAddShared}
+                onDismiss={handleShareBarDismissed}
+              />
+            )
           ) : sharePending ? null : (
             <TimeZoneConverter
               isCustomMode={isCustomMode}

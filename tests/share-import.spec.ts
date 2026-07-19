@@ -484,6 +484,30 @@ test.describe("the persistent Sharing View", () => {
     await expect(page.getByTestId("text-share-headline")).toBeVisible();
   });
 
+  test("Back after adding returns to the share view (not a dead end)", async ({ page }) => {
+    await page.addInitScript(seedZones(["chicago_US"]));
+    await dismissBanner(page);
+
+    await page.goto("/?z=tokyo_JP,paris_FR");
+    await page.getByTestId("button-share-import-add").click();
+
+    // Landed on the board; the share is consumed and the URL is clean.
+    await expect(tiles(page)).toHaveCount(3);
+    await expect(page.getByTestId("text-share-headline")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/\?z=/);
+
+    // The regression: Back used to be a dead end (the URL had been replaced). It now pushes a fresh
+    // entry over the ?z= one, so Back restores the shared URL and popstate re-enters the view.
+    await page.goBack();
+    await expect(page).toHaveURL(/\?z=tokyo_JP/);
+    await expect(page.getByTestId("text-share-headline")).toBeVisible();
+    await expect(sharedTiles(page)).toHaveCount(2);
+    // The recipient now owns both shared cities, so re-entry lands in the resting view (the all-owned
+    // skip), not the Commit Bar — the ellipsis menu is present and there's no import bar.
+    await expect(page.getByTestId("button-tile-menu-tokyo_JP")).toBeVisible();
+    await expect(importBar(page)).toHaveCount(0);
+  });
+
   test("Save on a resting tile re-enters Select Mode with just that city checked", async ({ page }) => {
     await page.addInitScript(seedZones(["chicago_US"]));
     await dismissBanner(page);

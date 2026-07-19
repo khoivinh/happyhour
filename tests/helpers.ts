@@ -63,8 +63,9 @@ export async function latestConsentUpdate(
   return (updates[updates.length - 1][2] ?? {}) as Record<string, unknown>;
 }
 
-/** Seed the saved-zones key so a test starts from a known board instead of the 3 seeded
- *  defaults. Also sets the onboarding flag, so the tagline never covers what we're asserting.
+/** Seed the saved-zones key so a test starts from a known board instead of the empty default
+ *  (new users now start with zero clocks). Also sets the onboarding flag, so the tagline never
+ *  covers what we're asserting.
  *  Must run before the app boots — call it via `page.addInitScript`.
  *
  *  Only writes when the key is absent, which matters more than it looks: init scripts re-run on

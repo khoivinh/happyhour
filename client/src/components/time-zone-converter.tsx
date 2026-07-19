@@ -286,12 +286,18 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   const [highlightedZone, setHighlightedZone] = useState<string | null>(null);
   // Onboarding tagline. `onboarded` is the source of truth (drives mount);
   // `taglineHiding` is the transient fade+collapse animation state.
+  //
+  // A *non-empty* saved board counts as onboarded, not merely the key's existence: the zones-persist
+  // effect writes "[]" as soon as the page mounts (even in the Share View), so keying on presence
+  // alone would treat a zero-clock visitor as a returning user — e.g. someone who opened a share,
+  // declined to log in, and clicked the logo to the dashboard would then miss the intro text.
   const [onboarded, setOnboarded] = useState<boolean>(() => {
     try {
-      return (
-        localStorage.getItem(ONBOARDED_KEY) === "1" ||
-        localStorage.getItem(STORAGE_KEY) !== null
-      );
+      if (localStorage.getItem(ONBOARDED_KEY) === "1") return true;
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return false;
+      const parsed = JSON.parse(stored);
+      return Array.isArray(parsed) && parsed.length > 0;
     } catch {
       return true; // storage blocked → don't nag; treat as onboarded
     }

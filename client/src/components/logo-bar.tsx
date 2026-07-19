@@ -12,10 +12,13 @@ import { useTheme } from "@/lib/theme-provider";
  *  was a duplicated literal guarded only by a comment promising the files agreed. A comment is not a
  *  mechanism; one definition is.
  *
- *  Deliberately not sticky and with no bottom rule: it scrolls away off the top, leaving the hero
- *  clock's rule as the only one at the top of the viewport (Figma 329:3241).
+ *  On the dashboard it's deliberately not sticky and has no bottom rule: it scrolls away off the top,
+ *  leaving the hero clock's rule as the only one at the top of the viewport (Figma 329:3241). The
+ *  Sharing View has no hero to take over as the pinned element, so there it opts into `sticky` — the
+ *  branding itself stays put on scroll, with a bottom rule to divide it from the tiles scrolling under.
+ *  The pinned wordmark's ink top is still 32px, so the fixed drawer icon (TOGGLE_TOP) aligns to it.
  */
-export function LogoBar({ linkHome = false }: { linkHome?: boolean }) {
+export function LogoBar({ linkHome = false, sticky = false }: { linkHome?: boolean; sticky?: boolean }) {
   const { resolvedTheme } = useTheme();
   const logoVariant = resolvedTheme === "happy" ? "happy" : "default";
 
@@ -41,7 +44,13 @@ export function LogoBar({ linkHome = false }: { linkHome?: boolean }) {
   );
 
   return (
-    <header className="bg-background px-6 md:px-12 lg:px-24 pt-[23px] pb-[10px]">
+    // z-40 matches the hero's sticky layer: below the fixed drawer nav (z-55) and the panel (z-70),
+    // above the scrolling tiles. Only the Sharing View pins; the dashboard keeps scrolling away.
+    <header
+      className={`bg-background px-6 md:px-12 lg:px-24 pt-[23px] pb-[10px]${
+        sticky ? " sticky top-0 z-40 border-b border-border" : ""
+      }`}
+    >
       <div className="mx-auto max-w-4xl flex flex-row items-center pl-[10px]">
         {linkHome ? (
           <a href="/" className="flex items-center gap-[10px] min-w-0">

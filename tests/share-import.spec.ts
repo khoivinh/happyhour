@@ -131,13 +131,23 @@ test.describe("arriving on a shared link", () => {
     await expect(page.getByTestId("text-geo-denied-hint")).toHaveCount(0);
   });
 
-  test("has no drawer toggle — its settings would act on a board not yet accepted", async ({ page }) => {
+  test("carries the drawer toggle and side panel, same as the board", async ({ page }) => {
     await page.addInitScript(seedZones(["chicago_US"]));
     await dismissBanner(page);
 
     await page.goto("/?z=tokyo_JP");
     await expect(importBar(page)).toBeVisible();
-    await expect(page.getByTestId("button-drawer-toggle")).toBeHidden();
+
+    // The drawer now rides along in the Sharing View: the toggle is visible and opens the panel.
+    const toggle = page.getByTestId("button-drawer-toggle");
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // Panel content is really there (not just the button state).
+    await expect(page.getByText("24-Hour Clock")).toBeVisible();
+    await expect(page.getByText("Appearance")).toBeVisible();
   });
 });
 
@@ -506,6 +516,23 @@ test.describe("the persistent Sharing View", () => {
     // skip), not the Commit Bar — the ellipsis menu is present and there's no import bar.
     await expect(page.getByTestId("button-tile-menu-tokyo_JP")).toBeVisible();
     await expect(importBar(page)).toHaveCount(0);
+  });
+
+  test("logo-escaping a share as a fresh visitor still shows the intro text on the board", async ({ page }) => {
+    // No seedZones: a genuinely new visitor (zero clocks, never onboarded). Opening the share mounts
+    // the page, whose zones-persist effect writes "[]" to localStorage — which must NOT then read as
+    // a returning user when the empty board loads.
+    await page.goto("/?z=tokyo_JP,paris_FR");
+    await expect(page.getByTestId("text-share-headline")).toBeVisible();
+
+    // Escape via the logo (a full navigation to the board), rather than logging in / adding.
+    await page.locator('header a[href="/"]').click();
+
+    // The board is empty AND the onboarding intro shows — the "[]" board is not mistaken for onboarded.
+    await expect(tiles(page)).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: /Track clocks and convert time zones/ })
+    ).toBeVisible();
   });
 
   test("Save on a resting tile re-enters Select Mode with just that city checked", async ({ page }) => {

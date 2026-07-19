@@ -350,8 +350,9 @@ export default function WorldClock() {
     <main className="min-h-[calc(100lvh+120px)] bg-background flex flex-col">
       {/* In the Sharing View the logo is the way out: a real link to the main board. It's a full
           navigation on purpose — Back then reloads the shared URL and re-enters the view (the params
-          are no longer stripped), which is far more reliable than reconstructing it from SPA history. */}
-      <LogoBar linkHome={Boolean(shareImport)} />
+          are no longer stripped), which is far more reliable than reconstructing it from SPA history.
+          It also pins on scroll there (the Sharing View has no hero to be the sticky element). */}
+      <LogoBar linkHome={Boolean(shareImport)} sticky={Boolean(shareImport)} />
 
       {/* Menu layer — fixed, mirrors the content column's horizontal layout exactly.
           The drawer toggle lives HERE rather than in the header for two reasons:
@@ -362,12 +363,14 @@ export default function WorldClock() {
               inside, putting its close icon at column_right − 10px; right-[10px] here is
               that same offset. Do NOT give the button a z-index: the panel (z-70) must cover
               it when open, so the sidebar's own close icon takes over in place. */}
-      {/* The Sharing View has no drawer (Figma 344:3787): its settings act on a board the visitor
-          hasn't accepted yet, and the sidebar's own controls would be editing someone else's
-          clocks. Hidden rather than disabled — there's nothing here it could apply to. */}
+      {/* The drawer now rides along in the Sharing View too (2026-07-19): the icon pins beside the
+          sticky branding and the panel works as on the dashboard (theme, 24h, Login, sync). Sort and
+          Show-Relative-Time set the visitor's own prefs but don't reorder the shared tiles — they
+          render in the sender's order — so they're silent no-ops here until the visitor's own board.
+          Still hidden during `sharePending` (the brief async resolve, when there's nothing yet). */}
       <nav
         aria-label="Main menu"
-        hidden={!!shareImport || sharePending}
+        hidden={sharePending}
         className="fixed inset-x-0 top-0 bottom-0 z-[55] px-6 md:px-12 lg:px-24 pointer-events-none"
       >
         <div className="mx-auto max-w-4xl relative h-full">

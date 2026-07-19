@@ -67,6 +67,36 @@ wouldn't re-parse). Fix:
   unaffected.
 - Skipped the 2-critic design loop (opt-in; Khoi judges live).
 
+## Follow-up fix — intro text after logo-escaping a share
+
+Reported after the round-2 deploy: a signed-out visitor who opened a share, declined to log in, and
+clicked the logo to the dashboard did **not** see the onboarding intro. Cause: the `onboarded` gate
+counted *any* saved zones key as "returning user", but the zones-persist effect writes `"[]"` the
+moment the page mounts (even in the Share View), so the empty board read as onboarded after the
+logo's full-reload nav. Fix: the gate now requires a **non-empty** saved board (or the explicit
+`ONBOARDED_KEY`), so a zero-clock visitor still gets the intro. New Playwright regression test
+(no-Clerk-safe, verified to fail pre-fix): open a `?z=` share as a fresh visitor → click the logo →
+the board is empty and the intro heading shows. **72 tests.**
+
+## Follow-up — drawer + side panel on the Sharing View
+
+Requested next: bring the drawer icon + side panel to the Sharing View (they were hidden there since
+round 4), with the branding + drawer icon pinned on scroll and the panel working as on the dashboard.
+Decisions: **pin the branding** (the Sharing View has no hero to be the sticky element, so the logo
+itself sticks); **show Sort/Relative-Time as-is** (they set the visitor's prefs but don't reorder the
+shared tiles — silent no-ops there).
+
+- **Un-hid the drawer** (`world-clock.tsx`): the nav gate went `hidden={!!shareImport || sharePending}`
+  → `hidden={sharePending}`. Every `Sidebar` prop was already in scope, so the panel works unchanged —
+  theme, 24h, sync, and **Login/Sign Up** (a second auth entry point next to the Registration Bar).
+- **Pinned the branding** (`logo-bar.tsx`): new `sticky?: boolean` prop → `sticky top-0 z-40 border-b
+  border-border` when set (else the dashboard's unchanged scroll-away). Passed `sticky={Boolean(shareImport)}`.
+  z-40 matches the hero's layer (below the fixed drawer nav z-55 / panel z-70); the pinned wordmark's
+  ink-top is still 32px, so the fixed drawer icon (`TOGGLE_TOP`) aligns to it with no new measuring.
+- Reversed the round-4 "no drawer" test → now asserts the toggle is visible on the Sharing View and
+  opens the panel (`aria-expanded`, "24-Hour Clock"/"Appearance" present). **72 tests.** The
+  sticky-on-scroll behavior is position-dependent → live QA.
+
 ## Notes / follow-ups
 - Reused the main-view Registration Bar copy ("Save your clocks with a free account") in the share
   context. Flag if share-specific copy is wanted.

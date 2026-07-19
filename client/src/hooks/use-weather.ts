@@ -25,7 +25,12 @@ export function useWeather(zoneKey: string | undefined) {
     enabled: !!city,
     staleTime: 10 * 60 * 1000,
     refetchInterval: 10 * 60 * 1000,
-    retry: 1,
+    // A shared link mounts every tile at once, firing a burst of parallel Open-Meteo calls; on a
+    // flaky mobile connection one transient failure would otherwise surface "Weather Unavailable"
+    // immediately (there's no loading state). Retry a few times with exponential backoff so blips
+    // recover silently — the tile stays blank until retries are exhausted, never a premature error.
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }
 

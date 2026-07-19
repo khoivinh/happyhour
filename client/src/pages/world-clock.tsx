@@ -347,7 +347,15 @@ export default function WorldClock() {
     // judders. Flooring main's height decouples the document height from the hero's height, so the
     // feedback loop cannot form, and guarantees SCROLL_RANGE is always reachable.
     // lvh (not dvh/svh) keeps the runway intact in every mobile URL-bar state.
-    <main className="min-h-[calc(100lvh+120px)] bg-background flex flex-col">
+    // The Sharing View has no hero, so it needs none of this: the oversized lvh+120 runway there is
+    // pure dead space that (with the sticky branding) also trips an iOS Safari compositing glitch —
+    // half the page paints blank until a scroll. It gets a plain 100dvh floor instead, which tracks
+    // the live viewport so content is never taller than what's visible on first paint.
+    <main
+      className={`bg-background flex flex-col ${
+        shareImport ? "min-h-[100dvh]" : "min-h-[calc(100lvh+120px)]"
+      }`}
+    >
       {/* In the Sharing View the logo is the way out: a real link to the main board. It's a full
           navigation on purpose — Back then reloads the shared URL and re-enters the view (the params
           are no longer stripped), which is far more reliable than reconstructing it from SPA history.

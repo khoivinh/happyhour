@@ -277,11 +277,24 @@
   }
 }
 
+/* Promote a `position: sticky` element to its own GPU compositing layer. iOS Safari (26.x) otherwise
+   repaints sticky headers late: on a shared link half the page paints blank until a scroll, and
+   scrolling content bleeds up ABOVE the pinned element. translateZ(0) on the sticky element itself
+   (not an ancestor — that would break the stickiness) forces a clean, isolated layer. Applied to the
+   Sharing View branding (logo-bar.tsx) and the dashboard hero (.hero-sticky, below). */
+.sticky-layer {
+  transform: translateZ(0);
+}
+
 /* The hero + its rule are one sticky unit. At scroll-top the rule sits 64px below
    the hero (Figma: hero ends 144, rule at 208); once shrunk the rule is flush against
-   it (both at 114). That gap is this padding, so the rule rides up as you scroll. */
+   it (both at 114). That gap is this padding, so the rule rides up as you scroll.
+   translateZ(0): same iOS compositing fix as .sticky-layer (kept inline here since this
+   rule already owns the sticky element's box). Transform on the sticky element is safe —
+   it's transform on an *ancestor* that would collapse the stickiness. */
 .hero-sticky {
   padding-bottom: calc(64px * (1 - var(--hero-ratio)));
+  transform: translateZ(0);
 }
 
 /* Scaled by --hero-ratio, so this gap only opens up as the hero becomes sticky. At scroll-top the

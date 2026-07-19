@@ -138,6 +138,13 @@ test.describe("arriving on a shared link", () => {
     await page.goto("/?z=tokyo_JP");
     await expect(importBar(page)).toBeVisible();
 
+    // The pinned branding carries no bottom rule of its own — the body-width rule above the headline
+    // is the only divider (2026-07-19). Guard against the full-width header border creeping back.
+    await expect(page.locator("header").filter({ hasText: "Happyhour" })).toHaveCSS(
+      "border-bottom-width",
+      "0px"
+    );
+
     // The drawer now rides along in the Sharing View: the toggle is visible and opens the panel.
     const toggle = page.getByTestId("button-drawer-toggle");
     await expect(toggle).toBeVisible();

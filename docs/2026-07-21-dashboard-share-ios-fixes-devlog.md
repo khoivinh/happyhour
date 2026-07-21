@@ -41,3 +41,31 @@ desktop Safari** — needs device QA. If it still bleeds, the documented next le
   2. Toggle a side-panel setting: the status-bar/address-bar region stays the theme color, no white flash.
   3. Open a shared link while signed in: the blue Registration Bar never flashes.
 - Skipped the 2-critic design loop (opt-in).
+
+## Device-QA outcome (2026-07-21) — bugs 1 & 2 NOT fixed; root causes reframed
+Khoi tested on iPhone (iOS 26), incl. a private window (rules out caching). **Bug 3 confirmed fixed at
+the code level and live; bugs 1 & 2 still broken.** Researched both — they're iOS-26 platform behavior,
+not small CSS bugs, and my shipped fixes were aimed at the wrong layer:
+
+- **Bug 2 — Safari 26 dropped `<meta theme-color>` support entirely.** iOS 26 now derives the
+  toolbar/status-bar/address-bar tint **at render time** from the `background-color` of fixed/sticky
+  elements near the viewport edges, falling back to `<body>` — and it **ignores `<html>` completely**
+  (so the `html { @apply bg-background }` fix could never affect the toolbar) and **does not re-sample
+  when a background changes via JS/CSS after load** (so switching theme leaves the toolbar stale). The
+  app's whole `applyThemeColor()` → rewrite-meta approach (theme-provider.tsx) is now a no-op on iOS
+  26. The `html`-background change is harmless and left in (keeps the overscroll *interior* consistent),
+  but it does not fix the reported mismatch. Known workarounds are partial: a scroll-timeline trick
+  (`animation-timeline: scroll(root)` on html/body) that only tracks the body color during overscroll;
+  or restructuring so a themed fixed/sticky element at each edge is what iOS samples. Needs a planned
+  rework; WebKit reportedly aims to address the regression in iOS 26.2+.
+- **Bug 1 — fundamental Safari sticky-compositing bug, no complete CSS fix** (per multiple reports).
+  `translateZ(0)`/`translate3d`/`will-change`/`backface-visibility` only partially help and can be
+  defeated by nested promoted layers. The compositing hints are left in (best-effort, harmless). Real
+  next levers if pursued: `translate3d(0,0,0)` on the nested clock element rather than the section, or
+  `viewport-fit=cover` + `env(safe-area-inset-*)` — both still device-QA and uncertain. Possibly a
+  WebKit fix lands in iOS 26.2+.
+
+**Net:** shipped code stands (bug 3 fixed; 1 & 2 hints are harmless no-ops on the real symptom). Bugs 1
+& 2 reclassified as **known iOS-26 issues** pending a planned rework or a WebKit fix.
+
+Sources: nasedk.in/blog/ios26-safari-toolbar-colors · benfrain.com/ios26-safari-theme-color-tab-tinting-with-fixed-position-elements · muffinman.io/blog/ios-safari-scroll-position-fixed

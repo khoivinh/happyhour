@@ -41,6 +41,7 @@ const USE_24H_KEY = "world-happyhour-24h";
 const SORT_ETW_KEY = "world-happyhour-sort-etw";
 const ZONES_KEY = "world-happyhour-zones";
 const SHOW_REL_TIME_KEY = "world-happyhour-rel-time";
+const SHOW_ZONE_ABBR_KEY = "world-happyhour-zone-abbr";
 
 /** "Tokyo, Paris, and London" for ≤3; "Tokyo, Paris, and 4 more" beyond. Uses bare city names
  *  (not the province-qualified display) so commas within names don't fracture the sentence. */
@@ -78,6 +79,13 @@ export default function WorldClock() {
   });
   const [showRelativeTime, setShowRelativeTime] = useState(() => {
     return localStorage.getItem(SHOW_REL_TIME_KEY) === "true";
+  });
+  // Zone abbreviations (EST, CET, JST…) default ON: a first-time or never-toggled visitor has no
+  // stored value and should see names. Only an explicit "false" (the user turned it off) opts out —
+  // so we branch on null rather than `=== "true"`, which would silently default everyone to off.
+  const [showZoneAbbr, setShowZoneAbbr] = useState(() => {
+    const stored = localStorage.getItem(SHOW_ZONE_ABBR_KEY);
+    return stored === null ? true : stored === "true";
   });
   const [selectedZones, setSelectedZones] = useState<string[]>(initZonesFromStorage);
   // Owned here rather than in TimeZoneConverter (where geolocation is resolved) only because
@@ -139,6 +147,10 @@ export default function WorldClock() {
   }, [showRelativeTime]);
 
   useEffect(() => {
+    localStorage.setItem(SHOW_ZONE_ABBR_KEY, String(showZoneAbbr));
+  }, [showZoneAbbr]);
+
+  useEffect(() => {
     localStorage.setItem(ZONES_KEY, JSON.stringify(selectedZones));
   }, [selectedZones]);
 
@@ -148,13 +160,15 @@ export default function WorldClock() {
       use24h: use24Hour,
       sortEastToWest,
       showRelativeTime,
+      showZoneAbbr,
       theme: theme as "light" | "dark" | "happy" | "system",
     },
-    setPreferences: useCallback((prefs: { zones: string[]; use24h: boolean; sortEastToWest: boolean; showRelativeTime: boolean; theme: "light" | "dark" | "happy" | "system" }) => {
+    setPreferences: useCallback((prefs: { zones: string[]; use24h: boolean; sortEastToWest: boolean; showRelativeTime: boolean; showZoneAbbr: boolean; theme: "light" | "dark" | "happy" | "system" }) => {
       setSelectedZones(prefs.zones);
       setUse24Hour(prefs.use24h);
       setSortEastToWest(prefs.sortEastToWest);
       setShowRelativeTime(prefs.showRelativeTime);
+      setShowZoneAbbr(prefs.showZoneAbbr);
       setTheme(prefs.theme);
     }, [setTheme]),
   });
@@ -338,6 +352,11 @@ export default function WorldClock() {
     track("toggle_relative_time", { enabled: value });
   }
 
+  function handleToggleShowZoneAbbr(value: boolean) {
+    setShowZoneAbbr(value);
+    track("toggle_zone_abbr", { enabled: value });
+  }
+
   return (
     // The +120px is a scroll runway, not decoration. The hero shrinks by ~94px as you scroll,
     // which SHORTENS the document; on a page that is only barely scrollable (one row of tiles on
@@ -412,6 +431,8 @@ export default function WorldClock() {
             onToggleSortEastToWest={handleToggleSortEastToWest}
             showRelativeTime={showRelativeTime}
             onToggleShowRelativeTime={handleToggleShowRelativeTime}
+            showZoneAbbr={showZoneAbbr}
+            onToggleShowZoneAbbr={handleToggleShowZoneAbbr}
             topOffset={TOGGLE_TOP}
             syncStatus={syncStatus}
           />
@@ -444,6 +465,7 @@ export default function WorldClock() {
                 t={shareImport.t}
                 ownedKeys={selectedZones}
                 use24Hour={use24Hour}
+                showZoneAbbr={showZoneAbbr}
                 onAdd={handleAddShared}
                 onDismiss={handleShareBarDismissed}
               />
@@ -453,6 +475,7 @@ export default function WorldClock() {
                 t={shareImport.t}
                 ownedKeys={selectedZones}
                 use24Hour={use24Hour}
+                showZoneAbbr={showZoneAbbr}
                 onAdd={handleAddShared}
                 onDismiss={handleShareBarDismissed}
               />
@@ -467,6 +490,7 @@ export default function WorldClock() {
               sortEastToWest={sortEastToWest}
               onSortEastToWestChange={setSortEastToWest}
               showRelativeTime={showRelativeTime}
+              showZoneAbbr={showZoneAbbr}
               selectedZones={selectedZones}
               onZonesChange={setSelectedZones}
               onGeoDeniedChange={setGeoDenied}

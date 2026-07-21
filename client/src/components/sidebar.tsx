@@ -138,6 +138,8 @@ interface SidebarProps {
   onToggleSortEastToWest: (value: boolean) => void;
   showRelativeTime: boolean;
   onToggleShowRelativeTime: (value: boolean) => void;
+  showZoneAbbr: boolean;
+  onToggleShowZoneAbbr: (value: boolean) => void;
   topOffset?: number;
   syncStatus: SyncStatus;
 }
@@ -151,6 +153,8 @@ export function Sidebar({
   onToggleSortEastToWest,
   showRelativeTime,
   onToggleShowRelativeTime,
+  showZoneAbbr,
+  onToggleShowZoneAbbr,
   topOffset = 28,
   syncStatus,
 }: SidebarProps) {
@@ -321,6 +325,15 @@ export function Sidebar({
                 Show Relative Time
               </span>
               <ToggleSwitch checked={showRelativeTime} onChange={onToggleShowRelativeTime} />
+            </div>
+
+            {/* Time Zone Names — swaps the GMT offset for a named abbreviation (EST, CET, JST…)
+                where one exists; zones without a known abbreviation stay as GMT+X. */}
+            <div className="flex items-center h-[28px]">
+              <span className="flex-1 font-medium text-[14px] leading-[22px] tracking-[-0.43px] uppercase text-[#efefef]">
+                Time Zone Names
+              </span>
+              <ToggleSwitch checked={showZoneAbbr} onChange={onToggleShowZoneAbbr} />
             </div>
 
             {/* Logout (only shown when signed in) */}

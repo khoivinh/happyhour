@@ -9,6 +9,7 @@ export interface SyncablePreferences {
   use24h: boolean;
   sortEastToWest: boolean;
   showRelativeTime: boolean;
+  showZoneAbbr: boolean;
   theme: "light" | "dark" | "happy" | "system";
 }
 
@@ -27,12 +28,15 @@ function cloudToLocal(cloud: Omit<CloudPreferences, "updatedAt">): SyncablePrefe
     use24h: cloud.use24h,
     sortEastToWest: cloud.sortEastToWest,
     showRelativeTime: cloud.showRelativeTime,
+    // Default-ON: a legacy record with no showZoneAbbr must read as true, or the initial sign-in
+    // sync would treat it as off and push that back — flipping the default off for the account.
+    showZoneAbbr: cloud.showZoneAbbr ?? true,
     theme: cloud.theme,
   };
 }
 
 function prefsFingerprint(p: SyncablePreferences): string {
-  return `${p.zones.join(",")}|${p.use24h}|${p.sortEastToWest}|${p.showRelativeTime}|${p.theme}`;
+  return `${p.zones.join(",")}|${p.use24h}|${p.sortEastToWest}|${p.showRelativeTime}|${p.showZoneAbbr}|${p.theme}`;
 }
 
 function saveSyncState(prefs: SyncablePreferences, updatedAt: string) {
@@ -136,7 +140,7 @@ function useCloudSyncWithAuth({ preferences, setPreferences }: UseCloudSyncOptio
   }, [isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced save on preference changes
-  const prefsKey = `${preferences.zones.join(",")}|${preferences.use24h}|${preferences.sortEastToWest}|${preferences.showRelativeTime}|${preferences.theme}`;
+  const prefsKey = `${preferences.zones.join(",")}|${preferences.use24h}|${preferences.sortEastToWest}|${preferences.showRelativeTime}|${preferences.showZoneAbbr}|${preferences.theme}`;
 
   useEffect(() => {
     if (!isSignedIn || isMergingRef.current) return;

@@ -23,7 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { getAllCities, getCityByKey, searchCities, getTimeInCityZone, formatCityDisplay, formatCityDetail, loadCities, loadTopCities, areCitiesLoaded, areSearchCitiesReady, didFullCitiesFail, type TimezoneOption } from "@/lib/city-lookup";
+import { getAllCities, getCityByKey, searchCities, getTimeInCityZone, formatCityDisplay, formatCityDetail, zoneLabel, loadCities, loadTopCities, areCitiesLoaded, areSearchCitiesReady, didFullCitiesFail, type TimezoneOption } from "@/lib/city-lookup";
 import { cacheTileMetadata, getCityOrCachedTile } from "@/lib/tile-cache";
 import { resolveLocalCity } from "@/lib/closest-city";
 import { track } from "@/lib/analytics";
@@ -88,6 +88,7 @@ interface TimeZoneConverterProps {
   sortEastToWest: boolean;
   onSortEastToWestChange: (value: boolean) => void;
   showRelativeTime: boolean;
+  showZoneAbbr: boolean;
   selectedZones: string[];
   onZonesChange: (zones: SetStateAction<string[]>) => void;
   /** Geolocation is resolved here, but the notice is shown in SiteFooter — a sibling of this
@@ -126,6 +127,7 @@ interface SortableClockItemProps {
   use24Hour: boolean;
   heroOffset: number;
   showRelativeTime: boolean;
+  showZoneAbbr: boolean;
 }
 
 function SortableClockItem({
@@ -149,6 +151,7 @@ function SortableClockItem({
   use24Hour,
   heroOffset,
   showRelativeTime,
+  showZoneAbbr,
 }: SortableClockItemProps) {
   const {
     attributes,
@@ -184,7 +187,7 @@ function SortableClockItem({
         time={city ? getTimeInCityZone(baseTime, city.offset) : baseTime}
         cityName={city ? formatCityDisplay(city) : zoneKey}
         cityShortName={city ? city.name : zoneKey}
-        timezone={city?.gmtLabel || ""}
+        timezone={city ? zoneLabel(city, showZoneAbbr) : ""}
         isSelectable
         selectedZoneKey={zoneKey}
         onZoneChange={(newZone) => onZoneChange(index, newZone)}
@@ -279,7 +282,7 @@ export function initZonesFromStorage(): string[] {
   }
 }
 
-export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, selectedZones, onZonesChange, onGeoDeniedChange, onShareModeChange, highlightedZones, onClockAdded }: TimeZoneConverterProps) {
+export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, onReset, use24Hour, sortEastToWest, onSortEastToWestChange, showRelativeTime, showZoneAbbr, selectedZones, onZonesChange, onGeoDeniedChange, onShareModeChange, highlightedZones, onClockAdded }: TimeZoneConverterProps) {
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [heroZone, setHeroZone] = useState<string>("london_GB");
   const [newlyAddedZone, setNewlyAddedZone] = useState<string | null>(null);
@@ -910,6 +913,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
                   use24Hour={use24Hour}
                   heroOffset={heroOffset}
                   showRelativeTime={showRelativeTime}
+                  showZoneAbbr={showZoneAbbr}
                 />
               ))}
             </div>
@@ -921,7 +925,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
                 <DigitalClock
                   time={getTimeInCityZone(baseTime, activeCity.offset)}
                   cityName={formatCityDisplay(activeCity)}
-                  timezone={activeCity.gmtLabel}
+                  timezone={zoneLabel(activeCity, showZoneAbbr)}
                   isSelectable={false}
                   isDraggable
                   isBeingDragged

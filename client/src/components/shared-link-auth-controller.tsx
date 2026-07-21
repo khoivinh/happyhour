@@ -13,6 +13,7 @@ interface SharedLinkAuthControllerProps {
   t: number | null;
   ownedKeys: string[];
   use24Hour: boolean;
+  showZoneAbbr: boolean;
   onAdd: (keys: string[]) => void;
   onDismiss?: () => void;
 }
@@ -31,7 +32,7 @@ interface SharedLinkAuthControllerProps {
  *    registrant has every shared clock auto-added and is taken to the board (via `onAdd`); a
  *    returning user is left in place, where the now-false `registerMode` reveals the Commit Bar.
  */
-export function SharedLinkAuthController({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss }: SharedLinkAuthControllerProps) {
+export function SharedLinkAuthController({ keys, t, ownedKeys, use24Hour, showZoneAbbr, onAdd, onDismiss }: SharedLinkAuthControllerProps) {
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
   const registerMode = !isSignedIn;
@@ -65,6 +66,7 @@ export function SharedLinkAuthController({ keys, t, ownedKeys, use24Hour, onAdd,
       t={t}
       ownedKeys={ownedKeys}
       use24Hour={use24Hour}
+      showZoneAbbr={showZoneAbbr}
       onAdd={onAdd}
       onDismiss={onDismiss}
       registerMode={registerMode}

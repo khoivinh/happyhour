@@ -126,6 +126,116 @@ function formatGmtLabel(offset: number): string {
   return `GMT${sign}${hours}:${minutes.toString().padStart(2, "0")}`;
 }
 
+/** A zone's UTC offset (hours) at a specific instant, via the same Intl shortOffset parse as
+ *  getGmtOffset but for an arbitrary date — lets us compare winter vs summer to detect DST. */
+function offsetAt(timezone: string, date: Date): number {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeZoneName: "shortOffset",
+    }).formatToParts(date);
+    const value = parts.find((p) => p.type === "timeZoneName")?.value;
+    const match = value?.match(/GMT([+-]?)(\d+)?(?::(\d+))?/);
+    if (match) {
+      const sign = match[1] === "-" ? -1 : 1;
+      return sign * (parseInt(match[2] || "0", 10) + parseInt(match[3] || "0", 10) / 60);
+    }
+  } catch { /* fall through to 0 */ }
+  return 0;
+}
+
+/** Curated IANA-zone → abbreviation map for zones the browser does NOT abbreviate: Intl's "short"
+ *  format returns real letters (EST, PDT) only for North-American zones and falls back to "GMT+2"
+ *  for most of the world, so CET/JST/etc. must come from here. US/Canada zones are intentionally
+ *  absent — the Intl fallback in getZoneAbbreviation already handles them. `dst` is the
+ *  daylight/summer form; which one is shown is decided from the live offset, never hardcoded, so
+ *  entries survive DST-rule changes. Some abbreviations are inherently ambiguous (CST = China and
+ *  US Central; IST = India and Israel) — accepted tradeoff of showing names by default. */
+const ZONE_ABBR: Record<string, { std: string; dst?: string }> = {
+  // Europe
+  "Europe/London": { std: "GMT", dst: "BST" },
+  "Europe/Dublin": { std: "GMT", dst: "IST" },
+  "Europe/Lisbon": { std: "WET", dst: "WEST" },
+  "Europe/Paris": { std: "CET", dst: "CEST" },
+  "Europe/Berlin": { std: "CET", dst: "CEST" },
+  "Europe/Madrid": { std: "CET", dst: "CEST" },
+  "Europe/Rome": { std: "CET", dst: "CEST" },
+  "Europe/Amsterdam": { std: "CET", dst: "CEST" },
+  "Europe/Brussels": { std: "CET", dst: "CEST" },
+  "Europe/Zurich": { std: "CET", dst: "CEST" },
+  "Europe/Vienna": { std: "CET", dst: "CEST" },
+  "Europe/Warsaw": { std: "CET", dst: "CEST" },
+  "Europe/Stockholm": { std: "CET", dst: "CEST" },
+  "Europe/Prague": { std: "CET", dst: "CEST" },
+  "Europe/Budapest": { std: "CET", dst: "CEST" },
+  "Europe/Copenhagen": { std: "CET", dst: "CEST" },
+  "Europe/Oslo": { std: "CET", dst: "CEST" },
+  "Europe/Athens": { std: "EET", dst: "EEST" },
+  "Europe/Helsinki": { std: "EET", dst: "EEST" },
+  "Europe/Bucharest": { std: "EET", dst: "EEST" },
+  "Europe/Kiev": { std: "EET", dst: "EEST" },
+  "Europe/Istanbul": { std: "TRT" },
+  "Europe/Moscow": { std: "MSK" },
+  // Asia
+  "Asia/Tokyo": { std: "JST" },
+  "Asia/Seoul": { std: "KST" },
+  "Asia/Shanghai": { std: "CST" },
+  "Asia/Hong_Kong": { std: "HKT" },
+  "Asia/Taipei": { std: "CST" },
+  "Asia/Singapore": { std: "SGT" },
+  "Asia/Kuala_Lumpur": { std: "MYT" },
+  "Asia/Bangkok": { std: "ICT" },
+  "Asia/Jakarta": { std: "WIB" },
+  "Asia/Manila": { std: "PHT" },
+  "Asia/Kolkata": { std: "IST" },
+  "Asia/Karachi": { std: "PKT" },
+  "Asia/Dubai": { std: "GST" },
+  "Asia/Riyadh": { std: "AST" },
+  "Asia/Tehran": { std: "IRST" },
+  "Asia/Jerusalem": { std: "IST", dst: "IDT" },
+  // Oceania
+  "Australia/Sydney": { std: "AEST", dst: "AEDT" },
+  "Australia/Brisbane": { std: "AEST" },
+  "Australia/Adelaide": { std: "ACST", dst: "ACDT" },
+  "Australia/Darwin": { std: "ACST" },
+  "Australia/Perth": { std: "AWST" },
+  "Pacific/Auckland": { std: "NZST", dst: "NZDT" },
+};
+
+/** The zone's named abbreviation to show in place of the GMT label, or null if none is known
+ *  (the caller then keeps "GMT+X"). Curated table first — picking std vs dst from the live offset —
+ *  then Intl "short" for the North-American zones it does abbreviate, then null. */
+export function getZoneAbbreviation(timezone: string): string | null {
+  const entry = ZONE_ABBR[timezone];
+  if (entry) {
+    if (!entry.dst) return entry.std;
+    // DST always shifts the clock forward (larger UTC offset). Compare the live offset against the
+    // year's standard (winter) offset; min() picks standard in either hemisphere, so no north/south
+    // special-casing — a southern zone in its summer is correctly detected as DST.
+    const now = new Date();
+    const year = now.getFullYear();
+    const stdOffset = Math.min(offsetAt(timezone, new Date(year, 0, 1)), offsetAt(timezone, new Date(year, 6, 1)));
+    return offsetAt(timezone, now) > stdOffset ? entry.dst : entry.std;
+  }
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeZoneName: "short",
+    }).formatToParts(new Date());
+    const value = parts.find((p) => p.type === "timeZoneName")?.value;
+    // Intl returns "GMT+2"/"UTC" for zones it can't abbreviate — reject those, keep real letters.
+    if (value && !/^(GMT|UTC)/.test(value)) return value;
+  } catch { /* ignore */ }
+  return null;
+}
+
+/** The tile meta-line label: the zone abbreviation when "Time Zone Names" is on and one exists,
+ *  else the GMT-offset label. Keeps the three tile call sites from repeating the fallback. */
+export function zoneLabel(city: TimezoneOption, showZoneAbbr: boolean): string {
+  if (!showZoneAbbr) return city.gmtLabel;
+  return getZoneAbbreviation(city.timezone) ?? city.gmtLabel;
+}
+
 function normalizeForKey(ascii: string): string {
   const baseName = ascii.replace(/[^a-zA-Z0-9]/g, "");
   return baseName.charAt(0).toLowerCase() + baseName.slice(1);

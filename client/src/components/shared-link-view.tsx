@@ -3,7 +3,7 @@ import { DigitalClock } from "@/components/digital-clock";
 import { CommitBar, CommitBarActions, CommitBarButton } from "@/components/commit-bar";
 import { RegistrationBar } from "@/components/registration-bar";
 import { MAX_CLOCKS } from "@/components/time-zone-converter";
-import { getCityByKey, formatCityDisplay, getTimeInCityZone } from "@/lib/city-lookup";
+import { getCityByKey, formatCityDisplay, getTimeInCityZone, zoneLabel } from "@/lib/city-lookup";
 
 interface SharedLinkViewProps {
   /** Shared city keys, already validated against the city lookup by the caller. */
@@ -13,6 +13,8 @@ interface SharedLinkViewProps {
   /** The recipient's current board — these can't be added again. */
   ownedKeys: string[];
   use24Hour: boolean;
+  /** Same "Time Zone Names" preference as the board: show abbreviations in place of GMT labels. */
+  showZoneAbbr: boolean;
   /** Commit the chosen cities. Fired after the retire transition, not on click. */
   onAdd: (keys: string[]) => void;
   /** The recipient dismissed the Commit Bar (Select Mode → Resting). Analytics only — the view
@@ -57,7 +59,7 @@ function headlineFor(count: number, live: boolean): string {
  * Cancel drops from Select Mode to Resting; it never tears the view down. The clocks tick in real
  * time, except a shared instant (&t=) freezes them until the recipient hits Reset Time.
  */
-export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss, registerMode = false }: SharedLinkViewProps) {
+export function SharedLinkView({ keys, t, ownedKeys, use24Hour, showZoneAbbr, onAdd, onDismiss, registerMode = false }: SharedLinkViewProps) {
   const owned = useMemo(() => new Set(ownedKeys), [ownedKeys]);
   /** How many of the shared cities the board can still take. Cities the recipient already has
    *  cost nothing — they're not being added. */
@@ -244,7 +246,7 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, onAdd, onDismiss
                   time={city ? getTimeInCityZone(baseTime, city.offset) : baseTime}
                   cityName={city ? formatCityDisplay(city) : key}
                   cityShortName={city ? city.name : key}
-                  timezone={city?.gmtLabel || ""}
+                  timezone={city ? zoneLabel(city, showZoneAbbr) : ""}
                   selectedZoneKey={key}
                   zoneKey={key}
                   use24Hour={use24Hour}

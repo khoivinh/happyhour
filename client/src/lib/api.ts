@@ -5,6 +5,9 @@ export interface CloudPreferences {
   use24h: boolean;
   sortEastToWest: boolean;
   showRelativeTime: boolean;
+  /** Optional so records saved before this preference existed still typecheck; a missing value
+   *  resolves to the default-ON true in cloudToLocal, never silently to false. */
+  showZoneAbbr?: boolean;
   theme: "dark" | "light" | "happy" | "system";
   updatedAt: string;
 }

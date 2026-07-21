@@ -51,10 +51,14 @@ export function LogoBar({ linkHome = false, sticky = false }: { linkHome?: boole
     // z-40 matches the hero's sticky layer: below the fixed drawer nav (z-55) and the panel (z-70),
     // above the scrolling tiles. Only the Sharing View pins; the dashboard keeps scrolling away.
     <header
-      className={`bg-background px-6 md:px-12 lg:px-24 pt-[23px] pb-[10px]${
-        sticky ? " sticky top-0 z-40 sticky-layer" : ""
+      className={`bg-background px-6 md:px-12 lg:px-24 pt-[23px] ${
+        sticky ? "pb-0 sticky top-0 z-40 sticky-layer" : "pb-[10px]"
       }`}
     >
+      {/* When sticky, the header drops its own bottom padding so the inner container's border-b lands
+          flush on the header's bottom edge — the rule *is* the edge, exactly like the dashboard hero's
+          `border-b border-border` (time-zone-converter.tsx). The pb-[10px] here is the gap ABOVE the
+          rule (branding → rule), not below it. */}
       <div
         className={`mx-auto max-w-4xl flex flex-row items-center pl-[10px]${
           sticky ? " border-b border-border pb-[10px]" : ""

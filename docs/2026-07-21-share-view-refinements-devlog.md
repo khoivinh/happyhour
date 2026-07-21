@@ -41,3 +41,12 @@ View, normal on the board. (Sort East-to-West is technically a no-op there too b
 ## Notes
 - Visual nuance to QA live: the pinned rule now reads as attached to the branding, with a touch more
   space (~35px vs ~25px) before the headline — the tradeoff of moving it onto the sticky header.
+
+## Follow-up (same day) — rule flush to the header's bottom edge
+Khoi flagged that the pinned rule floated ~10px above the sticky header's bottom edge (the header's own
+`pb-[10px]` sat *below* the rule) and asked it to define the edge like the dashboard hero. Fix: the
+sticky header now drops its bottom padding (`pb-0` when sticky; `pb-[10px]` otherwise), so the inner
+container's `border-b border-border` lands flush on the header's bottom edge — content scrolls right up
+to it. The 10px gap is now only *above* the rule (branding → rule), and rule → headline is 25px, matching
+the dashboard hero's `border-b border-border` + `pt-[25px]` exactly (same token, same 1px weight — those
+already matched). Guard added: the sticky branding `<header>` now asserts `padding-bottom: 0px`. 74 tests.

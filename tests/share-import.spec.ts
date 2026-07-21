@@ -145,6 +145,9 @@ test.describe("arriving on a shared link", () => {
     const branding = page.locator("header").filter({ hasText: "Happyhour" });
     await expect(branding).toHaveCSS("border-bottom-width", "0px");
     await expect(branding.locator("> div")).toHaveCSS("border-bottom-width", "1px");
+    // The sticky header drops its own bottom padding so the rule lands flush on the header's bottom
+    // edge (2026-07-21) — like the dashboard hero. Guards the ~10px offset from creeping back.
+    await expect(branding).toHaveCSS("padding-bottom", "0px");
 
     // The drawer now rides along in the Sharing View: the toggle is visible and opens the panel.
     const toggle = page.getByTestId("button-drawer-toggle");

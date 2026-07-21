@@ -25,6 +25,10 @@ interface SharedLinkViewProps {
    *  preview — there's no per-city choice to make, registering keeps them all. When false (the
    *  default, and always so in the no-Clerk test build) this is the unchanged Commit-Bar view. */
   registerMode?: boolean;
+  /** Whether Clerk auth has resolved (isLoaded). Gates the Registration Bar so it never mounts during
+   *  the pre-load window, when registerMode is provisionally true (isSignedIn undefined) and would
+   *  flash for a signed-in recipient. Defaults true so the no-Clerk build renders bars immediately. */
+  authResolved?: boolean;
 }
 
 const NUMBER_WORDS = [
@@ -59,7 +63,7 @@ function headlineFor(count: number, live: boolean): string {
  * Cancel drops from Select Mode to Resting; it never tears the view down. The clocks tick in real
  * time, except a shared instant (&t=) freezes them until the recipient hits Reset Time.
  */
-export function SharedLinkView({ keys, t, ownedKeys, use24Hour, showZoneAbbr, onAdd, onDismiss, registerMode = false }: SharedLinkViewProps) {
+export function SharedLinkView({ keys, t, ownedKeys, use24Hour, showZoneAbbr, onAdd, onDismiss, registerMode = false, authResolved = true }: SharedLinkViewProps) {
   const owned = useMemo(() => new Set(ownedKeys), [ownedKeys]);
   /** How many of the shared cities the board can still take. Cities the recipient already has
    *  cost nothing — they're not being added. */
@@ -272,7 +276,7 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, showZoneAbbr, on
           the add). "Later" hides it, leaving the clocks on view. The no-Clerk test build never sets
           registerMode, so it always renders the Commit Bar below. */}
       {registerMode
-        ? !registerDismissed && !retiring && (
+        ? authResolved && !registerDismissed && !retiring && (
             <RegistrationBar onDismiss={() => setRegisterDismissed(true)} />
           )
         : inSelect && !retiring && (

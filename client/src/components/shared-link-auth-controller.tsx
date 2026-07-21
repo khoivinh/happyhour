@@ -70,6 +70,10 @@ export function SharedLinkAuthController({ keys, t, ownedKeys, use24Hour, showZo
       onAdd={onAdd}
       onDismiss={onDismiss}
       registerMode={registerMode}
+      // Hold the Registration Bar until Clerk resolves: before isLoaded, isSignedIn is undefined so
+      // registerMode is true, which would flash the blue bar (and its slide-in) for a signed-in
+      // recipient before it flips to the Commit Bar. The tiles can render meanwhile.
+      authResolved={isLoaded}
     />
   );
 }

@@ -235,6 +235,12 @@
      Safari implements no scroll anchoring, so it never had the bug and is unaffected. */
   html {
     overflow-anchor: none;
+    /* The themed background must live on <html>, not just <body>: iOS Safari paints the overscroll
+       and address-bar regions from the document (html) background. With it only on <body>, an iOS
+       repaint after a settings change dropped the body's paint and exposed the unstyled document
+       (white) while the theme-color meta kept the chrome themed — a jarring mismatch (2026-07-21).
+       The theme class is on <html>, so this resolves to the current theme, same as <body>. */
+    @apply bg-background;
   }
 
   * {
@@ -281,9 +287,15 @@
    repaints sticky headers late: on a shared link half the page paints blank until a scroll, and
    scrolling content bleeds up ABOVE the pinned element. translateZ(0) on the sticky element itself
    (not an ancestor — that would break the stickiness) forces a clean, isolated layer. Applied to the
-   Sharing View branding (logo-bar.tsx) and the dashboard hero (.hero-sticky, below). */
+   Sharing View branding (logo-bar.tsx) and the dashboard hero (.hero-sticky, below).
+   translateZ(0) alone stopped holding on iOS 26 (a scrolled tile bled above the hero), so
+   will-change + backface-visibility keep the layer persistently promoted and repainting cleanly.
+   These are deliberately layout-safe — isolation/contain would risk the z-40/55/70 drawer stack. */
 .sticky-layer {
   transform: translateZ(0);
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 /* The hero + its rule are one sticky unit. At scroll-top the rule sits 64px below
@@ -295,6 +307,9 @@
 .hero-sticky {
   padding-bottom: calc(64px * (1 - var(--hero-ratio)));
   transform: translateZ(0);
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 /* Scaled by --hero-ratio, so this gap only opens up as the hero becomes sticky. At scroll-top the

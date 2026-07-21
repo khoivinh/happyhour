@@ -186,8 +186,9 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, showZoneAbbr, on
 
   return (
     <>
-      {/* The rule above the headline, per Figma — --border is #a3922a in happy, matching the frame. */}
-      <section className="border-t border-border pt-[25px]">
+      {/* No top rule here anymore: the divider now lives on the sticky LogoBar (body-width, pinned
+          under the branding), so it stays put on scroll instead of sliding away with this section. */}
+      <section className="pt-[25px]">
         <div
           onTransitionEnd={handleRetired}
           className={`grid overflow-hidden ease-out transition-[opacity,grid-template-rows] [transition-duration:180ms,360ms] [transition-delay:0ms,150ms] motion-reduce:transition-none ${

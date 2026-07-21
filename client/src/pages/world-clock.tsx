@@ -431,6 +431,7 @@ export default function WorldClock() {
             onToggleSortEastToWest={handleToggleSortEastToWest}
             showRelativeTime={showRelativeTime}
             onToggleShowRelativeTime={handleToggleShowRelativeTime}
+            relativeTimeDisabled={Boolean(shareImport)}
             showZoneAbbr={showZoneAbbr}
             onToggleShowZoneAbbr={handleToggleShowZoneAbbr}
             topOffset={TOGGLE_TOP}

@@ -15,10 +15,12 @@ import { useTheme } from "@/lib/theme-provider";
  *  On the dashboard it's deliberately not sticky: it scrolls away off the top, leaving the hero
  *  clock's rule as the only one at the top of the viewport (Figma 329:3241). The Sharing View has no
  *  hero to take over as the pinned element, so there it opts into `sticky` — the branding itself
- *  stays put on scroll. It carries no bottom rule of its own: the Sharing View's own body-width rule
- *  (above the headline, in shared-link-view.tsx) is the only divider, so a full-width header border
- *  would just double it up. The pinned wordmark's ink top is still 32px, so the fixed drawer icon
- *  (TOGGLE_TOP) aligns to it.
+ *  stays put on scroll. When sticky it carries a **body-width** bottom rule (on the inner max-w-4xl
+ *  container, not the full-width header — that width is deliberate, see 2026-07-19) so a single
+ *  divider stays pinned directly beneath the branding as content scrolls under it. The Sharing View's
+ *  section therefore no longer draws its own top rule, which used to scroll away and leave the pinned
+ *  branding with nothing under it. The pinned wordmark's ink top is still 32px, so the fixed drawer
+ *  icon (TOGGLE_TOP) aligns to it.
  */
 export function LogoBar({ linkHome = false, sticky = false }: { linkHome?: boolean; sticky?: boolean }) {
   const { resolvedTheme } = useTheme();
@@ -53,7 +55,11 @@ export function LogoBar({ linkHome = false, sticky = false }: { linkHome?: boole
         sticky ? " sticky top-0 z-40 sticky-layer" : ""
       }`}
     >
-      <div className="mx-auto max-w-4xl flex flex-row items-center pl-[10px]">
+      <div
+        className={`mx-auto max-w-4xl flex flex-row items-center pl-[10px]${
+          sticky ? " border-b border-border pb-[10px]" : ""
+        }`}
+      >
         {linkHome ? (
           <a href="/" className="flex items-center gap-[10px] min-w-0">
             {lockup}

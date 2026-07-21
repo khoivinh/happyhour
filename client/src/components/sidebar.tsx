@@ -13,15 +13,21 @@ const isClerkConfigured = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 interface ToggleSwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
+  /** Inert + grayed. Used where the setting has no effect on the current view (e.g. Relative Time
+   *  in the Sharing View, where the viewer's own time isn't on screen to be relative to). */
+  disabled?: boolean;
 }
 
-function ToggleSwitch({ checked, onChange }: ToggleSwitchProps) {
+function ToggleSwitch({ checked, onChange, disabled = false }: ToggleSwitchProps) {
   return (
     <button
       role="switch"
       aria-checked={checked}
-      onClick={() => onChange(!checked)}
+      aria-disabled={disabled || undefined}
+      onClick={() => !disabled && onChange(!checked)}
       className={`relative w-[33px] h-[18px] rounded-full border transition-colors duration-200 shrink-0 bg-transparent ${
+        disabled ? "opacity-40 cursor-not-allowed " : ""
+      }${
         checked
           ? "border-[#22c55e]"
           : "border-[#6b7280]"
@@ -138,6 +144,9 @@ interface SidebarProps {
   onToggleSortEastToWest: (value: boolean) => void;
   showRelativeTime: boolean;
   onToggleShowRelativeTime: (value: boolean) => void;
+  /** Sharing View disables Relative Time — the viewer's own time isn't shown there, so there's
+   *  nothing for the offset to be relative to. */
+  relativeTimeDisabled?: boolean;
   showZoneAbbr: boolean;
   onToggleShowZoneAbbr: (value: boolean) => void;
   topOffset?: number;
@@ -153,6 +162,7 @@ export function Sidebar({
   onToggleSortEastToWest,
   showRelativeTime,
   onToggleShowRelativeTime,
+  relativeTimeDisabled = false,
   showZoneAbbr,
   onToggleShowZoneAbbr,
   topOffset = 28,
@@ -319,12 +329,12 @@ export function Sidebar({
               <ToggleSwitch checked={sortEastToWest} onChange={onToggleSortEastToWest} />
             </div>
 
-            {/* Show Relative Time */}
+            {/* Relative Time — grayed + inert in the Sharing View (no local time on screen to anchor to). */}
             <div className="flex items-center h-[28px]">
-              <span className="flex-1 font-medium text-[14px] leading-[22px] tracking-[-0.43px] uppercase text-[#efefef]">
-                Show Relative Time
+              <span className={`flex-1 font-medium text-[14px] leading-[22px] tracking-[-0.43px] uppercase text-[#efefef]${relativeTimeDisabled ? " opacity-40" : ""}`}>
+                Relative Time
               </span>
-              <ToggleSwitch checked={showRelativeTime} onChange={onToggleShowRelativeTime} />
+              <ToggleSwitch checked={showRelativeTime} onChange={onToggleShowRelativeTime} disabled={relativeTimeDisabled} />
             </div>
 
             {/* Time Zone Names — swaps the GMT offset for a named abbreviation (EST, CET, JST…)

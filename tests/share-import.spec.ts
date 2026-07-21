@@ -138,12 +138,13 @@ test.describe("arriving on a shared link", () => {
     await page.goto("/?z=tokyo_JP");
     await expect(importBar(page)).toBeVisible();
 
-    // The pinned branding carries no bottom rule of its own — the body-width rule above the headline
-    // is the only divider (2026-07-19). Guard against the full-width header border creeping back.
-    await expect(page.locator("header").filter({ hasText: "Happyhour" })).toHaveCSS(
-      "border-bottom-width",
-      "0px"
-    );
+    // The sticky branding owns the divider now: a BODY-WIDTH rule on the inner container that pins
+    // under the branding on scroll (2026-07-21, replacing the section's top rule that used to slide
+    // away). The full-width <header> stays borderless — guard both against a full-width rule (removed
+    // 2026-07-19) creeping back AND against the body-width rule going missing.
+    const branding = page.locator("header").filter({ hasText: "Happyhour" });
+    await expect(branding).toHaveCSS("border-bottom-width", "0px");
+    await expect(branding.locator("> div")).toHaveCSS("border-bottom-width", "1px");
 
     // The drawer now rides along in the Sharing View: the toggle is visible and opens the panel.
     const toggle = page.getByTestId("button-drawer-toggle");
@@ -155,6 +156,13 @@ test.describe("arriving on a shared link", () => {
     // Panel content is really there (not just the button state).
     await expect(page.getByText("24-Hour Clock")).toBeVisible();
     await expect(page.getByText("Appearance")).toBeVisible();
+
+    // Relative Time is disabled in the Sharing View — the viewer's own time isn't on screen to be
+    // relative to (2026-07-21). The switch is inert; 24-Hour, alongside it, stays enabled.
+    const relRow = page.getByText("Relative Time", { exact: true }).locator("xpath=..");
+    await expect(relRow.getByRole("switch")).toHaveAttribute("aria-disabled", "true");
+    const hourRow = page.getByText("24-Hour Clock", { exact: true }).locator("xpath=..");
+    await expect(hourRow.getByRole("switch")).not.toHaveAttribute("aria-disabled", "true");
   });
 });
 

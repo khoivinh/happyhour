@@ -620,7 +620,7 @@ export function DigitalClock({
               <p className={`mt-[10px] text-xs text-muted-foreground flex items-center ${(relativeOffset !== undefined || dayIndicator) ? "gap-[6px]" : "gap-[10px]"}`}>
                 <span>{timezone}</span>
                 {(relativeOffset !== undefined || dayIndicator) && (
-                  <span className="inline-flex items-center justify-center px-[5px] gap-[5px] border border-[#6b7280] rounded-[3px] text-[8px] font-semibold uppercase text-[#6b7280] leading-[16px] whitespace-nowrap shrink-0">
+                  <span className="inline-flex items-center justify-center px-[5px] gap-[5px] border border-[#6b7280] rounded-[3px] text-[9px] font-semibold uppercase text-[#6b7280] leading-[16px] whitespace-nowrap shrink-0">
                     {relativeOffset !== undefined && <span className="tracking-[0.2px]">{formatRelativeOffset(relativeOffset)}</span>}
                     {relativeOffset !== undefined && dayIndicator && <span className="bg-[#6b7280] self-stretch w-px shrink-0" />}
                     {dayIndicator && <span className="tracking-[0.2px]">{dayIndicator === "next" ? "Next Day" : "Prev Day"}</span>}
@@ -666,7 +666,7 @@ export function DigitalClock({
             <p className={`text-xs text-muted-foreground sm:hidden flex items-center flex-wrap ${(relativeOffset !== undefined || dayIndicator) ? "gap-[6px]" : "gap-[10px]"}`}>
               <span>{timezone}</span>
               {(relativeOffset !== undefined || dayIndicator) && (
-                <span className="inline-flex items-center justify-center px-[5px] gap-[5px] border border-[#6b7280] rounded-[3px] text-[8px] font-semibold uppercase text-[#6b7280] leading-[16px] whitespace-nowrap shrink-0">
+                <span className="inline-flex items-center justify-center px-[5px] gap-[5px] border border-[#6b7280] rounded-[3px] text-[9px] font-semibold uppercase text-[#6b7280] leading-[16px] whitespace-nowrap shrink-0">
                   {relativeOffset !== undefined && <span className="tracking-[0.2px]">{formatRelativeOffset(relativeOffset)}</span>}
                   {relativeOffset !== undefined && dayIndicator && <span className="bg-[#6b7280] self-stretch w-px shrink-0" />}
                   {dayIndicator && <span className="tracking-[0.2px]">{dayIndicator === "next" ? "Next Day" : "Prev Day"}</span>}

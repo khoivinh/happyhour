@@ -264,7 +264,16 @@ export function Sidebar({
         }`}
         style={{
           top: `${topOffset - 18}px`,
-          height: `calc(92dvh - ${topOffset - 18 + 28}px)`,
+          // Full viewport height, inset by the same gap top and bottom: `topOffset - 18` is the top
+          // gap (the line above), so doubling it leaves an identical gap below. Deriving it keeps
+          // the symmetry correct by construction if TOGGLE_TOP is ever raised.
+          //
+          // 100dvh, not a percentage of it: `dvh` already excludes the mobile browser's address-bar
+          // chrome, so there's nothing left to hold back. The old `92dvh` was a leftover from the
+          // `100vh` era (vh *does* count the area behind chrome, which ran the panel below the
+          // fold); the 2026-03-25 fix was the vh→dvh unit change, and the percentage was
+          // belt-and-braces that outlived it. Don't re-introduce one.
+          height: `calc(100dvh - ${(topOffset - 18) * 2}px)`,
           animation: open
             ? "sidebar-open 350ms cubic-bezier(0.32, 0.72, 0, 1) forwards"
             : hasBeenOpened.current

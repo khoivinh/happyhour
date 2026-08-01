@@ -98,7 +98,7 @@ export function CommitBarActions({ children }: { children: ReactNode }) {
 }
 
 /** Three tiers of emphasis, so the rightmost filled pill is always *the* action:
- *  - ghost:     the way out (Cancel). Label only.
+ *  - ghost:     the way out (Done). Label only.
  *  - secondary: a real action, but not the one (Copy Link, when Share is also present).
  *  - primary:   the bar's reason for existing.
  *  Copy Link moves between secondary and primary depending on whether Share renders beside it —

@@ -60,8 +60,10 @@ export function ShareSelectionBar({
       </button>
 
       <CommitBarActions>
+        {/* Reads "Done", not "Cancel": leaving select-mode keeps the board exactly as it was, so
+            there is nothing to cancel. The testId keeps its original name. */}
         <CommitBarButton variant="ghost" onClick={onCancel} testId="button-share-cancel">
-          Cancel
+          Done
         </CommitBarButton>
         <CommitBarButton
           variant={canNativeShare ? "secondary" : "primary"}

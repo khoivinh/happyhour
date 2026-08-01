@@ -18,7 +18,7 @@ interface SharedLinkViewProps {
   /** Commit the chosen cities. Fired after the retire transition, not on click. */
   onAdd: (keys: string[]) => void;
   /** The recipient dismissed the Commit Bar (Select Mode → Resting). Analytics only — the view
-   *  stays mounted; escaping the Sharing View is the logo's job, not Cancel's. */
+   *  stays mounted; escaping the Sharing View is the logo's job, not Done's. */
   onDismiss?: () => void;
   /** Signed-out recipient (Clerk-only path, set by SharedLinkAuthController): show the blue
    *  Registration Bar instead of the Commit Bar, and render the tiles as a checkless, display-only
@@ -60,7 +60,7 @@ function headlineFor(count: number, live: boolean): string {
  *    another — the check carries selection. Owned cities show a settled gray check and can't toggle.
  *  - **Resting** (after the bar is dismissed): plain live clocks, each with an ellipsis "Save {city}"
  *    menu that flips the tile — and the view — back into Select Mode.
- * Cancel drops from Select Mode to Resting; it never tears the view down. The clocks tick in real
+ * Done drops from Select Mode to Resting; it never tears the view down. The clocks tick in real
  * time, except a shared instant (&t=) freezes them until the recipient hits Reset Time.
  */
 export function SharedLinkView({ keys, t, ownedKeys, use24Hour, showZoneAbbr, onAdd, onDismiss, registerMode = false, authResolved = true }: SharedLinkViewProps) {
@@ -151,14 +151,14 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, showZoneAbbr, on
     [onAdd]
   );
 
-  /** Cancel: leave Select Mode for Resting. The view stays put — this is the whole point of the
+  /** Done: leave Select Mode for Resting. The view stays put — this is the whole point of the
    *  round. `onDismiss` is analytics only. */
   const dismissBar = useCallback(() => {
     setMode("resting");
     onDismiss?.();
   }, [onDismiss]);
 
-  // Esc is the keyboard equivalent of Cancel: it drops Select Mode to Resting without tearing the
+  // Esc is the keyboard equivalent of Done: it drops Select Mode to Resting without tearing the
   // view down. Mirrors the board's share-mode Escape handler (time-zone-converter.tsx).
   useEffect(() => {
     if (mode !== "select") return;
@@ -214,7 +214,7 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, showZoneAbbr, on
 
         {/* Reset Time — custom shares only. The slot is reserved whenever there's a frozen instant
             to toggle (t != null), so the grid never jumps; the link itself hides in Select Mode and
-            appears once the recipient drops to Resting via Cancel. Its label toggles with the state:
+            appears once the recipient drops to Resting via Done. Its label toggles with the state:
             "Reset Time" while frozen, "Restore Custom Time" once switched to live. Right-aligned above
             the first tile, styled to match the hero's own reset link (digital-clock.tsx). */}
         {t != null && (
@@ -286,7 +286,7 @@ export function SharedLinkView({ keys, t, ownedKeys, use24Hour, showZoneAbbr, on
               </p>
               <CommitBarActions>
                 <CommitBarButton variant="ghost" onClick={dismissBar} testId="button-share-import-cancel">
-                  Cancel
+                  Done
                 </CommitBarButton>
                 <CommitBarButton
                   variant="primary"

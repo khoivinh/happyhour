@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { GripVertical, Check, ChevronsUpDown, Share, Trash2, Plus } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -32,6 +32,11 @@ function EllipsisCircleIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+/** `step` for the time inputs, in seconds. Constrains the native picker wheel and the arrow keys to
+ *  five-minute jumps; a directly-typed value is deliberately left alone, so 5:03 still commits as
+ *  5:03. Values >= 60 also keep the browser from growing a seconds field. */
+const FIVE_MINUTES_S = 300;
 
 interface DigitalClockProps {
   time: Date;
@@ -318,13 +323,36 @@ export function DigitalClock({
     }
   }
 
+  /** Abandon the edit without applying it — the same outcome as clicking outside. */
+  function cancelEdit() {
+    setIsEditing(false);
+    setEditTime("");
+  }
+
+  /** Keyboard commit/cancel for the time inputs. Escape *discards* rather than commits, matching
+   *  the click-outside behaviour above and the two other Escape bindings in the app (share
+   *  select-mode, and the Sharing View's drop to resting).
+   *
+   *  Both keys stop propagation: those other bindings listen on `document`, so an un-stopped
+   *  Escape here would close the editor *and* tear down share mode in the same keystroke. */
+  function handleEditKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      handleUpdateClick();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      cancelEdit();
+    }
+  }
+
   // Close editing when clicking outside
   useEffect(() => {
     if (!isEditing) return;
     function handleClickOutside(e: MouseEvent) {
       if (editContainerRef.current && !editContainerRef.current.contains(e.target as Node)) {
-        setIsEditing(false);
-        setEditTime("");
+        cancelEdit();
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -369,8 +397,10 @@ export function DigitalClock({
                 <div className="hidden sm:flex w-full items-center gap-[10px] border border-[#c4c7cc] rounded-[12px] pl-[20px] pr-[25px] py-[10px]">
                   <input
                     type="time"
+                    step={FIVE_MINUTES_S}
                     value={editTime}
                     onChange={(e) => setEditTime(e.target.value)}
+                    onKeyDown={handleEditKeyDown}
                     className="font-display text-[48px] font-black leading-normal bg-transparent border-none outline-none appearance-none p-0 flex-1 min-w-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                     autoFocus
                     data-testid="input-edit-time"
@@ -387,8 +417,10 @@ export function DigitalClock({
                 <div className="flex sm:hidden w-full items-center justify-between gap-[10px] border border-[#c4c7cc] rounded-[10px] pl-[13px] pr-[11px] py-[10px]">
                   <input
                     type="time"
+                    step={FIVE_MINUTES_S}
                     value={editTime}
                     onChange={(e) => setEditTime(e.target.value)}
+                    onKeyDown={handleEditKeyDown}
                     className="font-display text-[28px] font-black leading-normal bg-transparent border-none outline-none appearance-none p-0 min-w-0 w-[170px] [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                     autoFocus
                   />
@@ -591,8 +623,10 @@ export function DigitalClock({
               <div className="flex w-full items-center gap-[15px] border border-[#c4c7cc] rounded-[8px] pl-[16px] pr-[12px] pt-[11px] pb-[12px] overflow-hidden">
                 <input
                   type="time"
+                  step={FIVE_MINUTES_S}
                   value={editTime}
                   onChange={(e) => setEditTime(e.target.value)}
+                  onKeyDown={handleEditKeyDown}
                   className="font-display text-[24px] font-black leading-[36px] tracking-[-0.6px] [font-variant-numeric:proportional-nums] [font-feature-settings:'zero'_0] bg-transparent border-none outline-none appearance-none p-0 flex-1 min-w-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                   autoFocus
                 />
@@ -646,8 +680,10 @@ export function DigitalClock({
               <div className="flex w-full items-center gap-[10px] border border-[#c4c7cc] rounded-[8px] pl-[16px] pr-[10px] pt-[9px] pb-[10px] overflow-hidden">
                 <input
                   type="time"
+                  step={FIVE_MINUTES_S}
                   value={editTime}
                   onChange={(e) => setEditTime(e.target.value)}
+                  onKeyDown={handleEditKeyDown}
                   className="font-display text-[18px] font-black leading-[33px] tracking-[-0.6px] [font-variant-numeric:proportional-nums] [font-feature-settings:'zero'_0] bg-transparent border-none outline-none appearance-none p-0 flex-1 min-w-0 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                   autoFocus
                 />

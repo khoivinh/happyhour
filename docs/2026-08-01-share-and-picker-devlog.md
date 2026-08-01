@@ -20,15 +20,40 @@ correct.** The repo lives on local disk at `~/Developer/Happyhour`; `find -flags
 workaround is obsolete here. STATUS.md carried it as a next step and as a pointer warning about
 "this iCloud-synced repo" — both retired in this commit.
 
-## 1. Five-minute picker steps, and keyboard commit
+## 1. Five-minute picker steps — tried, then abandoned same day
 
-`step={300}` on all four `<input type="time">` (hero and tile × desktop and mobile). The native
-wheel on iOS/Android and the desktop arrow keys now move in five-minute jumps.
+**Shipped as `step={300}` on all four `<input type="time">`, then reverted. The feature is dropped;
+only the keyboard commit below survives.**
 
-**A typed value is deliberately left alone** — 5:03 still commits as 5:03. `step` constrains the
-picker, not the keyboard, and forcing a round would mean silently overriding someone who typed an
-exact time. This was an explicit call, so there's a test pinning it against a future "let's snap it
-to the nearest five" change.
+The reasoning I gave for `step` was wrong. I claimed the native iOS/Android wheels honor it and only
+desktop typing escapes — that was the basis for choosing `step` alone over rounding, and it doesn't
+hold. Device QA showed the iOS wheel still offering every minute.
+
+What's actually true:
+
+- **`step` is a validity constraint, not a picker constraint.** MDN defines it as "only values which
+  are a whole number of steps from the step base are valid" and promises nothing about picker
+  granularity.
+- **iOS never receives it.** The wheel is a separate implementation (`WKContentViewInteraction`)
+  that doesn't get these constraints — the same architecture that makes `min`/`max` inert there
+  ([WebKit #225639](https://bugs.webkit.org/show_bug.cgi?id=225639), filed 2021, still `NEW` as of
+  Feb 2026).
+- **Chromium declined on purpose.** [Issue 40705754](https://issues.chromium.org/issues/40705754) is
+  exactly `<input type="time" step="300"> still shows every minute in dropdown`, resolved **Won't
+  Fix** — they allow selecting invalid values in the picker, mirroring the fact that you can type
+  one.
+
+So no browser snaps a time picker to `step`. Enforcing five-minute increments would have required
+either rounding a typed value on commit, or hand-building the control (a `<select>` of five-minute
+values — structurally sound, since a select can't emit a value it doesn't list, but it means owning
+12/24-hour conversion that `<input type="time">` does for free, plus a second editor to maintain
+across four render sites).
+
+**Neither was worth it, so the requirement was dropped rather than approximated.** `step` is gone —
+leaving it in would have implied a guarantee that isn't there. A test now pins the *absence* of
+granularity, so a future change that starts snapping values is a conscious one.
+
+## 1b. Keyboard commit (kept)
 
 Return commits. **Escape cancels — a deliberate departure from the note, which asked for both keys
 to commit.** Escape already means cancel twice in this app (share select-mode at
@@ -92,9 +117,12 @@ Separator is `/` per the note — commas would collide with city names like "New
 
 ## Decisions
 
-- **Escape cancels rather than commits** (see §1). The only departure from the written notes;
+- **Escape cancels rather than commits** (see §1b). The only departure from the written notes;
   raised before implementing and confirmed.
-- **Off-step typed values pass through untouched.** `step` shapes the picker, not the keyboard.
+- **The five-minute increment requirement was dropped, not approximated** (see §1). `step` can't
+  deliver it on any platform, and the two things that could — rounding typed input, or a
+  hand-built control — were both judged worse than not having it. Better to leave the editor
+  honest than to ship a constraint that holds on desktop and silently doesn't on a phone.
 - **Cities are named by `city.name`**, so the string reads "New York City", not "New York" as the
   notes' shorthand had it. `formatCityDisplay` would have added ", NY" — extra noise in a message
   meant to be skimmed.
@@ -109,11 +137,11 @@ Separator is `/` per the note — commas would collide with city names like "New
 
 ## Tests
 
-**85 pass, up from 75.** Two new files:
+**84 pass, up from 75.** Two new files (the `step` attribute test went with the feature):
 
 | File | Covers |
 |---|---|
-| `tests/time-picker.spec.ts` | `step="300"`; Return commits; Escape abandons; Escape doesn't tear down share mode; off-step values pass through |
+| `tests/time-picker.spec.ts` | Return commits; Escape abandons; Escape doesn't tear down share mode; any minute is settable (no granularity) |
 | `tests/share-text.spec.ts` | exact live string; clipboard payload shape; `?z=` ordering; custom-time form omits zones; both bars read "Done" |
 
 The share-text specs seed cities **deliberately out of east-to-west order** (Paris, Tokyo, New York),

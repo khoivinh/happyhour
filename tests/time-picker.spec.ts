@@ -1,12 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
 import { blockExternal, seedZones } from "./helpers";
 
-/** The custom-time editor on the hero clock: how it steps, and how it commits.
+/** The custom-time editor on the hero clock: how it commits, and how it backs out.
  *
- *  `step` is asserted as an attribute rather than by driving the picker — the native wheel and the
- *  arrow-key behaviour it controls live in the browser, not in our code, so pinning the attribute
- *  is what actually guards the intent. A directly-typed off-step value is deliberately *not*
- *  rejected, and there's a test below to keep that from being "fixed" by accident. */
+ *  There is deliberately no minute-granularity constraint here. A `step` attribute was tried and
+ *  removed (2026-08-01): `step` on a time input is a *validity* rule, not a picker rule — iOS
+ *  Safari's wheel never receives it, and Chromium closed the matching request Won't Fix. Enforcing
+ *  five-minute increments would have meant rounding a typed value or hand-building the control,
+ *  and neither was worth it. See the devlog. */
 
 const editor = (page: Page) => page.getByTestId("input-edit-time");
 const heroTime = (page: Page) => page.getByTestId("text-hero-time");
@@ -21,13 +22,11 @@ async function openEditor(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
+  // The hero clock renders seconds while it's live, so any assertion that reads its text twice
+  // races the wall clock. Pinning Date.now() makes the display constant — without it, "the clock
+  // is unchanged after Escape" fails whenever the two reads straddle a second boundary.
+  await page.clock.setFixedTime(new Date("2026-08-01T12:00:00Z"));
   await page.addInitScript(seedZones(["tokyo_JP", "paris_FR"]));
-});
-
-test("the time inputs step in five-minute jumps", async ({ page }) => {
-  await openEditor(page);
-  // 300s = 5min. Also keeps the browser from growing a seconds field (any step >= 60 does).
-  await expect(editor(page)).toHaveAttribute("step", "300");
 });
 
 test("Return commits the edit and closes the editor", async ({ page }) => {
@@ -84,9 +83,10 @@ test("Escape in the editor does not also tear down share select-mode", async ({ 
   await expect(page.getByTestId("share-selection-bar")).toBeHidden();
 });
 
-test("a typed off-step value is left alone, not rounded", async ({ page }) => {
-  // Deliberate: `step` shapes the picker, it doesn't police typing. Someone who types 5:03 means
-  // 5:03. Asserted so a later "let's snap it to the nearest five" change is a conscious one.
+test("any minute is settable — the editor imposes no granularity", async ({ page }) => {
+  // Guards the 2026-08-01 decision to drop the five-minute constraint rather than enforce it in
+  // our own code. If a future change starts snapping typed values, this should fail and be a
+  // conscious call, not a side effect.
   await openEditor(page);
   await editor(page).fill("05:03");
   await editor(page).press("Enter");

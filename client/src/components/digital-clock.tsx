@@ -33,11 +33,6 @@ function EllipsisCircleIcon({ className }: { className?: string }) {
   );
 }
 
-/** `step` for the time inputs, in seconds. Constrains the native picker wheel and the arrow keys to
- *  five-minute jumps; a directly-typed value is deliberately left alone, so 5:03 still commits as
- *  5:03. Values >= 60 also keep the browser from growing a seconds field. */
-const FIVE_MINUTES_S = 300;
-
 interface DigitalClockProps {
   time: Date;
   cityName: string;
@@ -397,7 +392,6 @@ export function DigitalClock({
                 <div className="hidden sm:flex w-full items-center gap-[10px] border border-[#c4c7cc] rounded-[12px] pl-[20px] pr-[25px] py-[10px]">
                   <input
                     type="time"
-                    step={FIVE_MINUTES_S}
                     value={editTime}
                     onChange={(e) => setEditTime(e.target.value)}
                     onKeyDown={handleEditKeyDown}
@@ -417,7 +411,6 @@ export function DigitalClock({
                 <div className="flex sm:hidden w-full items-center justify-between gap-[10px] border border-[#c4c7cc] rounded-[10px] pl-[13px] pr-[11px] py-[10px]">
                   <input
                     type="time"
-                    step={FIVE_MINUTES_S}
                     value={editTime}
                     onChange={(e) => setEditTime(e.target.value)}
                     onKeyDown={handleEditKeyDown}
@@ -623,7 +616,6 @@ export function DigitalClock({
               <div className="flex w-full items-center gap-[15px] border border-[#c4c7cc] rounded-[8px] pl-[16px] pr-[12px] pt-[11px] pb-[12px] overflow-hidden">
                 <input
                   type="time"
-                  step={FIVE_MINUTES_S}
                   value={editTime}
                   onChange={(e) => setEditTime(e.target.value)}
                   onKeyDown={handleEditKeyDown}
@@ -680,7 +672,6 @@ export function DigitalClock({
               <div className="flex w-full items-center gap-[10px] border border-[#c4c7cc] rounded-[8px] pl-[16px] pr-[10px] pt-[9px] pb-[10px] overflow-hidden">
                 <input
                   type="time"
-                  step={FIVE_MINUTES_S}
                   value={editTime}
                   onChange={(e) => setEditTime(e.target.value)}
                   onKeyDown={handleEditKeyDown}

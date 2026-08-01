@@ -24,6 +24,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { getAllCities, getCityByKey, searchCities, getTimeInCityZone, formatCityDisplay, formatCityDetail, zoneLabel, loadCities, loadTopCities, areCitiesLoaded, areSearchCitiesReady, didFullCitiesFail, type TimezoneOption } from "@/lib/city-lookup";
+import { buildShareText, buildSharePayload } from "@/lib/share-text";
 import { cacheTileMetadata, getCityOrCachedTile } from "@/lib/tile-cache";
 import { resolveLocalCity } from "@/lib/closest-city";
 import { track } from "@/lib/analytics";
@@ -431,30 +432,46 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     return `${window.location.origin}/?${params.toString()}`;
   }, [shareKeys, isCustomMode, selectedTime]);
 
+  /** The message that travels with the link — the times spelled out, so a share is readable in the
+   *  thread without opening anything. Built at send time, not render time, so a live share quotes
+   *  the moment it was actually sent. */
+  const buildShareMessage = useCallback(() => {
+    const url = buildShareUrl();
+    const text = buildShareText(shareKeys, {
+      use24Hour,
+      customTime: isCustomMode && selectedTime ? selectedTime : null,
+    });
+    return { url, text, payload: buildSharePayload(text, url) };
+  }, [buildShareUrl, shareKeys, use24Hour, isCustomMode, selectedTime]);
+
   /** Hand the link to the OS share sheet. Only reachable where `navigator.share` exists — the bar
    *  hides Share otherwise rather than quietly turning it into a second Copy Link. */
   const commitShare = useCallback(async () => {
     if (shareKeys.length === 0) return;
-    const url = buildShareUrl();
+    const { url, text } = buildShareMessage();
     // Fires before the sheet resolves: this counts intent, and a cancelled sheet is
     // indistinguishable from a completed one anyway (the Web Share API doesn't say).
     track("share_committed", { count: shareKeys.length, method: "native" });
     try {
-      await navigator.share!({ url });
+      // `text` and `url` as separate fields, not pre-joined: targets that understand a URL (SMS,
+      // most chat apps) get to render their own preview card rather than a link buried in prose.
+      await navigator.share!({ text, url });
     } catch {
       /* native share sheet cancelled — nothing to do */
     }
     // The bar stays put after the sheet closes: the user may want to copy the link too, or share
     // again, and yanking the selection out from under them the moment the OS sheet dismisses is
     // exactly the kind of instability this round is removing.
-  }, [shareKeys, buildShareUrl]);
+  }, [shareKeys, buildShareMessage]);
 
   const copyShareLink = useCallback(async () => {
     if (shareKeys.length === 0) return;
-    const url = buildShareUrl();
+    const { payload } = buildShareMessage();
     track("share_committed", { count: shareKeys.length, method: "copy" });
     try {
-      await navigator.clipboard.writeText(url);
+      // The clipboard gets one string, so the text and link are joined here — the URL last, on its
+      // own line, where chat clients will still detect and unfurl it.
+      await navigator.clipboard.writeText(payload);
     } catch {
       /* clipboard blocked (insecure context, or permission denied) — leave select mode intact
          so the selection isn't silently lost with nothing to show for it. */
@@ -465,7 +482,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     setLinkCopied(true);
     if (copiedTimer.current) clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(() => setLinkCopied(false), 3000);
-  }, [shareKeys, buildShareUrl]);
+  }, [shareKeys, buildShareMessage]);
 
   // Three-tier load: top (fast, inline bundle) → cache fallback → full (lazy).
   useEffect(() => {

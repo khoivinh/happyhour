@@ -221,6 +221,16 @@ const STORAGE_KEY = "world-happyhour-zones";
 // count as "already onboarded", so only a genuinely new visitor sees the tagline.
 const ONBOARDED_KEY = "world-happyhour-onboarded";
 
+/** Sort comparator: easternmost first, i.e. descending UTC offset. Shared by the "Sort East to
+ *  West" board preference and the share set, so both mean the same thing by the phrase.
+ *
+ *  Offsets come from the tile cache and reflect each zone's *current* DST state. A share carrying
+ *  a custom instant (&t=) months away could therefore order two zones by today's offsets rather
+ *  than the ones in force at that instant — an edge case left alone deliberately. */
+function byEastToWest(a: string, b: string): number {
+  return (getCityOrCachedTile(b)?.offset ?? 0) - (getCityOrCachedTile(a)?.offset ?? 0);
+}
+
 function detectLocalCity(): string {
   try {
     const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -399,11 +409,18 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
 
   // (Footer clearance while the bar is up is reserved by CommitBar itself, on mount.)
 
-  // Effective share set: selected grid tiles in grid order, optionally prefixed with the
-  // local (hero) city. Deduped so a hero that's also a selected tile counts once.
+  // Effective share set: the selected grid tiles plus, optionally, the local (hero) city. Deduped
+  // so a hero that's also a selected tile counts once.
+  //
+  // Always ordered east-to-west, never in grid or selection order: a shared board should read the
+  // same way whoever assembled it and whatever order they tapped the tiles in. This is the order
+  // the recipient's tiles, the ?z= payload and the share text all inherit. The local city sorts
+  // into position with the rest rather than being pinned first — it's one of the cities, not a
+  // header.
   const shareKeys = useMemo(() => {
     const selected = selectedZones.filter((z) => shareSelection.has(z));
-    return includeLocal ? [heroZone, ...selected.filter((z) => z !== heroZone)] : selected;
+    const all = includeLocal ? [heroZone, ...selected.filter((z) => z !== heroZone)] : selected;
+    return [...all].sort(byEastToWest);
   }, [selectedZones, shareSelection, includeLocal, heroZone]);
 
   const buildShareUrl = useCallback(() => {
@@ -493,11 +510,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
       // Snapshot current manual order before sorting
       onZonesChange((prev) => {
         preSortOrderRef.current = [...prev];
-        const sorted = [...prev].sort((a, b) => {
-          const cityA = getCityOrCachedTile(a);
-          const cityB = getCityOrCachedTile(b);
-          return (cityB?.offset ?? 0) - (cityA?.offset ?? 0);
-        });
+        const sorted = [...prev].sort(byEastToWest);
         if (sorted.every((z, i) => z === prev[i])) return prev;
         return sorted;
       });

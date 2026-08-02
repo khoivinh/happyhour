@@ -3,6 +3,19 @@
 Four edits from `Scratch/2026-08-01-happyhour-edits.md`, plus the tests for them. Second devlog of
 the day; the first (`2026-08-01-devlog.md`) was the iCloud husk cleanup and changed no app code.
 
+**Outcome: three shipped, one retired on evidence.** All live on happyhour.day.
+
+| Edit | Outcome |
+|---|---|
+| Return / Escape commit | shipped — Escape *cancels*, a deliberate departure from the note |
+| "Cancel" → "Done", both bars | shipped |
+| East-to-west share ordering | shipped |
+| Share text alongside the link | shipped |
+| Five-minute picker increments | **retired** — no browser honours `step` on a time picker |
+
+Seven commits, `52ba366..4e40047`. The five-minute increment shipped mid-session and was reverted
+the same day after device QA; §1 records why, so it isn't attempted again.
+
 ## 0. Setup check first
 
 The session opened with a repo-health pass, since the previous one had found the working directory
@@ -129,9 +142,9 @@ Separator is `/` per the note — commas would collide with city names like "New
 - **`share-text.ts` is tested through the browser, not as a pure function.** It depends on the
   runtime-loaded city lookup and the `@/` alias, so a Node-only spec (the `functions/lib/preview.ts`
   pattern) would test neither the data nor the wiring.
-- **Tests pin the clock with `setFixedTime`, not `install` + `pauseAt`.** The suite's usual idiom
-  fails here: the fake clock ticks during page load, so the target instant is already in its past by
-  the time the page is ready. `setFixedTime` is the right tool when only `Date.now()` needs pinning.
+- **Both new specs pin the clock with `setFixedTime`, not `install` + `pauseAt`** — for two
+  different reasons, see below. The suite's existing idiom is right when you need to *control*
+  timers; `setFixedTime` is right when you only need `Date.now()` to hold still.
 - **Two typos in the source notes corrected:** `GTM-4` → `GMT-4`, and a stray `PM` in the 24-hour
   example (`Paris 21:00 PM`).
 
@@ -147,6 +160,35 @@ Separator is `/` per the note — commas would collide with city names like "New
 The share-text specs seed cities **deliberately out of east-to-west order** (Paris, Tokyo, New York),
 so a correctly-sorted result can only have come from sorting — not from accidentally inheriting the
 seed order.
+
+### Two different clock problems, one answer
+
+Both new specs ended up on `setFixedTime`, but for unrelated reasons — worth separating, because the
+suite's usual `install()` + `pauseAt()` is still correct elsewhere.
+
+**`share-text.spec.ts` — `pauseAt` can't reach the instant.** The text needs an exact known time so
+the expected string can be literal (`Tokyo 9:00 PM JST GMT+9/…`). But `install({time})` starts the
+fake clock ticking from that instant, and page load burns several fake seconds, so by the time
+`pauseAt(INSTANT)` runs the target is already in the clock's past — `Cannot fast-forward to the
+past`. `setFixedTime` sidesteps it: `Date.now()` simply never moves.
+
+**`time-picker.spec.ts` — a flaky test of my own making.** "Escape abandons the edit" read the hero
+clock's text, opened the editor, pressed Escape, then asserted the text was unchanged. **The hero
+renders seconds while it's live**, so those two reads race the wall clock. It passed on the first
+run and failed once the file's timing shifted after the `step` test was removed:
+
+```
+Expected: "6:49:34 PM"
+Received: "6:49:40 PM"
+```
+
+The bug was the assertion, not the app. Pinning `Date.now()` for the whole spec makes the display
+constant and kills the class of flake rather than the one instance. Re-ran three times clean.
+
+**The transferable rule:** never snapshot-compare the hero clock's text across an interaction. It
+shows seconds in live mode, so any two reads may differ for reasons that have nothing to do with
+what's being tested. Either pin the clock, or assert on something stable (`button-reset-time`
+visibility is the real signal that a custom time was committed).
 
 ## Next steps
 

@@ -304,6 +304,10 @@ export function DigitalClock({
   const { data: weather, isError: weatherUnavailable } = useWeather(zoneKey || selectedZoneKey);
 
   function handleTimeClick() {
+    // Deliberately *not* gated on isSelectMode. Grid tiles go inert in select mode because the
+    // whole tile becomes the selection target, but the hero's check is its own button, so the two
+    // never compete — and editing the time mid-share is supported on purpose (2026-08-01: Escape
+    // closes the editor without tearing down the share bar, per time-picker.spec.ts).
     if (onTimeUpdate && zoneKey) {
       setEditTime(`${rawHours.toString().padStart(2, "0")}:${minutes}`);
       setIsEditing(true);
@@ -375,6 +379,65 @@ export function DigitalClock({
   // Region-free label for menu/dialog copy; falls back to the qualified name if not supplied.
   const shortName = cityShortName ?? cityName;
 
+  /* The hero's trailing control: a ⋯ menu at rest, a select check while a share is being
+     assembled. Both sit in the same box — the tiles' `py-[11px] px-[5px]` — so the swap can't
+     shift the row, and both use the tiles' own assets so the hero reads as one of the family.
+     Only reachable when the board wired up onShare; the Sharing View passes neither.
+     The hero is given `zoneKey` rather than `selectedZoneKey` (that one is the grid tiles' city
+     picker), so resolve whichever is present. */
+  const heroKey = zoneKey ?? selectedZoneKey;
+  const heroMenuSlot = isSelectMode ? (
+    /* Unlike the tiles this is the tap target itself, not a pointer-events-none mark: a tile
+       delegates the tap to a full-tile overlay, but the hero's body is the time <p> that opens the
+       editor, so the check has to be its own button. Locked/blocked don't apply here — the hero is
+       the user's own city and is only ever in or out. */
+    <button
+      type="button"
+      onClick={() => heroKey && onToggleSelect?.(heroKey)}
+      className="flex-shrink-0 flex items-center justify-center py-[11px] px-[5px] touch-manipulation"
+      aria-pressed={isSelected}
+      title={isSelected ? "Remove local time from this share" : "Include local time in this share"}
+      data-testid={`select-check-${heroKey}`}
+    >
+      <span
+        className={cn(
+          "flex h-[17px] w-[17px] items-center justify-center rounded-full transition-colors",
+          isSelected ? "bg-foreground text-background" : "border-[1.5px] border-foreground/40"
+        )}
+        data-state={isSelected ? "selected" : "unselected"}
+      >
+        {isSelected && <Check className="h-[11px] w-[11px]" strokeWidth={3} />}
+      </span>
+    </button>
+  ) : onShare ? (
+    <Popover open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="flex-shrink-0 flex items-center justify-center py-[11px] px-[5px] rounded-md text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation"
+          onClick={(e) => e.stopPropagation()}
+          title="Options"
+          data-testid="button-hero-menu"
+        >
+          <EllipsisCircleIcon />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="share-tile-menu w-[307px] p-1.5 rounded-[10px]">
+        <button
+          type="button"
+          className="flex w-full items-center gap-3 h-11 px-3 rounded-[7px] text-[15px] font-medium text-popover-foreground hover:bg-muted transition-colors"
+          onClick={() => {
+            setIsMenuOpen(false);
+            if (heroKey) onShare(heroKey);
+          }}
+          data-testid="menu-share-local-time"
+        >
+          <Share className="h-[18px] w-[18px] shrink-0" />
+          <span className="truncate">Share Local Time</span>
+        </button>
+      </PopoverContent>
+    </Popover>
+  ) : null;
+
   if (isHero) {
     return (
       <div className="hero-clock px-[10px] flex flex-col gap-[2px] sm:gap-0">
@@ -426,20 +489,25 @@ export function DigitalClock({
                 </div>
               </div>
             ) : (
-              // Size, leading and tracking all scale with --hero-ratio as the page scrolls;
-              // the values and the breakpoint live in index.css under .hero-time.
-              // w-fit is load-bearing: as a block child of a flex column this <p> would otherwise
-              // stretch the full column width, putting its click target under the drawer icon —
-              // so a tap that just missed the icon opened the time editor instead.
-              <p
-                className="hero-time w-fit font-display font-black text-foreground cursor-pointer hover:text-primary transition-colors whitespace-nowrap"
-                onClick={handleTimeClick}
-                title="Click to edit time"
-                data-testid="text-hero-time"
-              >
-                <span>{timeString}</span>
-                {!use24Hour && <span className="hero-time__ampm">{` ${amPm}`}</span>}
-              </p>
+              // items-end bottom-aligns the ⋯ / check with the baseline of the numbers, which grow
+              // and shrink with --hero-ratio on scroll — anchoring to the top would drift.
+              <div className="flex items-end justify-between gap-2">
+                {/* Size, leading and tracking all scale with --hero-ratio as the page scrolls;
+                    the values and the breakpoint live in index.css under .hero-time.
+                    w-fit is load-bearing: as a block child of a flex column this <p> would otherwise
+                    stretch the full column width, putting its click target under the drawer icon —
+                    so a tap that just missed the icon opened the time editor instead. */}
+                <p
+                  className="hero-time w-fit font-display font-black text-foreground cursor-pointer hover:text-primary transition-colors whitespace-nowrap"
+                  onClick={handleTimeClick}
+                  title="Click to edit time"
+                  data-testid="text-hero-time"
+                >
+                  <span>{timeString}</span>
+                  {!use24Hour && <span className="hero-time__ampm">{` ${amPm}`}</span>}
+                </p>
+                {heroMenuSlot}
+              </div>
             )}
           </div>
         </div>
@@ -643,7 +711,15 @@ export function DigitalClock({
                   {!use24Hour && <span className="text-[24px] leading-7">{` ${amPm}`}</span>}
                 </p>
               </div>
-              <p className={`mt-[10px] text-xs text-muted-foreground flex items-center ${(relativeOffset !== undefined || dayIndicator) ? "gap-[6px]" : "gap-[10px]"}`}>
+              {/* min-h matches the badge's own height (leading-[16px] + 1px border top and bottom),
+                  so the row measures the same whether or not a badge is mounted. Without it the row
+                  is 16px bare and 18px with a badge, and items-center re-centres the zone label a
+                  pixel lower — the whole grid twitches when Relative Time is toggled. Same reason
+                  the hero's meta row is pinned to h-[28px]. */}
+              <p
+                className={`mt-[10px] min-h-[18px] text-xs text-muted-foreground flex items-center ${(relativeOffset !== undefined || dayIndicator) ? "gap-[6px]" : "gap-[10px]"}`}
+                data-testid={`tile-meta-${selectedZoneKey}`}
+              >
                 <span>{timezone}</span>
                 {(relativeOffset !== undefined || dayIndicator) && (
                   <span className="inline-flex items-center justify-center px-[5px] gap-[5px] border border-[#6b7280] rounded-[3px] text-[9px] font-semibold uppercase text-[#6b7280] leading-[16px] whitespace-nowrap shrink-0">
@@ -688,9 +764,10 @@ export function DigitalClock({
             </div>
           )}
 
-          {/* Mobile: zone + temp below city name */}
+          {/* Mobile: zone + temp below city name. min-h as on the desktop row above — see the
+              note there. */}
           {!isEditing && (
-            <p className={`text-xs text-muted-foreground sm:hidden flex items-center flex-wrap ${(relativeOffset !== undefined || dayIndicator) ? "gap-[6px]" : "gap-[10px]"}`}>
+            <p className={`min-h-[18px] text-xs text-muted-foreground sm:hidden flex items-center flex-wrap ${(relativeOffset !== undefined || dayIndicator) ? "gap-[6px]" : "gap-[10px]"}`}>
               <span>{timezone}</span>
               {(relativeOffset !== undefined || dayIndicator) && (
                 <span className="inline-flex items-center justify-center px-[5px] gap-[5px] border border-[#6b7280] rounded-[3px] text-[9px] font-semibold uppercase text-[#6b7280] leading-[16px] whitespace-nowrap shrink-0">

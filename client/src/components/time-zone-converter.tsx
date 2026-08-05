@@ -357,7 +357,12 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   // ---- Share flow: select-mode state ----
   const [shareMode, setShareMode] = useState(false);
   const [shareSelection, setShareSelection] = useState<Set<string>>(() => new Set());
+  // Whether the local (hero) city rides along. Driven by the hero's own ⋯ menu and select check,
+  // not by the bottom bar — the bar's checkbox now governs the link instead.
   const [includeLocal, setIncludeLocal] = useState(false);
+  // Whether the happyhour.day link is attached. Defaults on: a share without the link is the
+  // exception (times only, for somewhere a URL would be noise), not the norm.
+  const [includeLink, setIncludeLink] = useState(true);
   // Read once, not per render: a browser doesn't grow a share sheet mid-session, and the bar's
   // shape shouldn't depend on when React happens to re-render.
   const [canNativeShare] = useState(
@@ -370,9 +375,12 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
 
-  const enterShareMode = useCallback((seedKey: string) => {
-    setShareSelection(new Set([seedKey]));
-    setIncludeLocal(false);
+  /** `withLocal` is set by the hero's "Share Local Time" — it seeds no grid tile, so the hero has
+   *  to arrive already checked or the bar would open with nothing selected. */
+  const enterShareMode = useCallback((seedKey: string | null, withLocal = false) => {
+    setShareSelection(seedKey ? new Set([seedKey]) : new Set());
+    setIncludeLocal(withLocal);
+    setIncludeLink(true);
     setLinkCopied(false);
     setShareMode(true);
     track("share_started");
@@ -391,6 +399,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     setShareMode(false);
     setShareSelection(new Set());
     setIncludeLocal(false);
+    setIncludeLink(true);
   }, []);
 
   // Report select-mode up to the page so it can gray out the drawer toggle (a sibling above us).
@@ -439,10 +448,14 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     const url = buildShareUrl();
     const text = buildShareText(shareKeys, {
       use24Hour,
+      showZoneAbbr,
       customTime: isCustomMode && selectedTime ? selectedTime : null,
     });
+    // With the link off the message is the times and nothing else — the share sheet gets no `url`
+    // field at all rather than an empty one, so a target can't render a stray blank link.
+    if (!includeLink) return { url: null, text, payload: text };
     return { url, text, payload: buildSharePayload(text, url) };
-  }, [buildShareUrl, shareKeys, use24Hour, isCustomMode, selectedTime]);
+  }, [buildShareUrl, shareKeys, use24Hour, showZoneAbbr, isCustomMode, selectedTime, includeLink]);
 
   /** Hand the link to the OS share sheet. Only reachable where `navigator.share` exists — the bar
    *  hides Share otherwise rather than quietly turning it into a second Copy Link. */
@@ -455,7 +468,8 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     try {
       // `text` and `url` as separate fields, not pre-joined: targets that understand a URL (SMS,
       // most chat apps) get to render their own preview card rather than a link buried in prose.
-      await navigator.share!({ text, url });
+      // The key is omitted entirely when the link is off — `url: null` isn't a valid ShareData.
+      await navigator.share!(url ? { text, url } : { text });
     } catch {
       /* native share sheet cancelled — nothing to do */
     }
@@ -804,6 +818,12 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
           isCustomMode={isCustomMode}
           onReset={onReset}
           use24Hour={use24Hour}
+          // The hero's ⋯ → "Share Local Time" opens the share with no grid tile seeded, only the
+          // local city; its check then toggles that city in and out for as long as the bar is up.
+          onShare={() => enterShareMode(null, true)}
+          isSelectMode={shareMode}
+          isSelected={includeLocal}
+          onToggleSelect={() => setIncludeLocal((v) => !v)}
         />
       </section>
 
@@ -974,8 +994,8 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
       {shareMode && (
         <ShareSelectionBar
           count={shareKeys.length}
-          includeLocal={includeLocal}
-          onToggleIncludeLocal={() => setIncludeLocal((v) => !v)}
+          includeLink={includeLink}
+          onToggleIncludeLink={() => setIncludeLink((v) => !v)}
           onCancel={cancelShareMode}
           onShare={commitShare}
           onCopyLink={copyShareLink}

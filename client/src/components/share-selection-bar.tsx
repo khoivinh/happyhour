@@ -4,8 +4,9 @@ import { CommitBar, CommitBarActions, CommitBarButton } from "@/components/commi
 interface ShareSelectionBarProps {
   /** Number of cities that will be shared (selected tiles + local city if included). */
   count: number;
-  includeLocal: boolean;
-  onToggleIncludeLocal: () => void;
+  /** Whether the happyhour.day link rides along with the message. Defaults on. */
+  includeLink: boolean;
+  onToggleIncludeLink: () => void;
   onCancel: () => void;
   onShare: () => void;
   onCopyLink: () => void;
@@ -28,8 +29,8 @@ interface ShareSelectionBarProps {
  */
 export function ShareSelectionBar({
   count,
-  includeLocal,
-  onToggleIncludeLocal,
+  includeLink,
+  onToggleIncludeLink,
   onCancel,
   onShare,
   onCopyLink,
@@ -40,23 +41,26 @@ export function ShareSelectionBar({
 
   return (
     <CommitBar testId="share-selection-bar">
+      {/* Governs the link, not the local city — that moved to the hero clock's own ⋯ menu and
+          select check. The testId keeps its original name so specs and analytics stay put, the
+          same way "Cancel" → "Done" did. */}
       <button
         type="button"
-        onClick={onToggleIncludeLocal}
+        onClick={onToggleIncludeLink}
         className="flex items-center gap-2.5 text-sm font-medium text-[var(--share-bar-fg)]"
-        aria-pressed={includeLocal}
+        aria-pressed={includeLink}
         data-testid="checkbox-include-local"
       >
         <span
           className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-            includeLocal
+            includeLink
               ? "border-[var(--share-bar-accent)] bg-[var(--share-bar-accent)] text-[var(--share-bar-accent-fg)]"
               : "border-[var(--share-bar-fg)]"
           }`}
         >
-          {includeLocal && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+          {includeLink && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
         </span>
-        Include my local time
+        Include Happyhour link
       </button>
 
       <CommitBarActions>

@@ -1,7 +1,7 @@
 import {
   getCityByKey,
   getTimeInCityZone,
-  getZoneAbbreviation,
+  zoneLabel,
   type TimezoneOption,
 } from "@/lib/city-lookup";
 
@@ -10,9 +10,12 @@ import {
  * alongside it so the times are legible in the message itself — in a chat thread, an email, or a
  * notification preview that never renders the OG card.
  *
+ * Each city reads time → AM/PM → zone → city, so the numbers line up down the left edge when a
+ * reader scans several at once; the city name is the label, not the lead.
+ *
  * Two shapes, matching the two kinds of share:
- *   custom  "New York City 3:00 PM/Paris 9:00 PM/Bengaluru 12:30 AM"
- *   live    "Current time in New York City 3:00 PM EDT GMT-4/Paris 9:00 PM CEST GMT+2"
+ *   custom  "3:00 PM New York City/9:00 PM Paris/12:30 AM Bengaluru"
+ *   live    "Current time — 3:00 PM EDT New York City/9:00 PM CEST Paris"
  *
  * A custom share is a conversion — the instant is fixed and the zones are implied by the cities,
  * so naming them would be noise. A live share is a snapshot of *now*, where the zone tells the
@@ -21,6 +24,10 @@ import {
 
 /** Separator between cities. Slashes, not commas — city names contain commas. */
 const SEP = "/";
+
+/** Lead-in for the live form only. "Current time in …" read correctly when the city came first;
+ *  with the time leading it no longer parses as a sentence, so this is a label, not a clause. */
+const LIVE_PREFIX = "Current time — ";
 
 /** Clock face for one city, in the reader's own 12/24-hour preference. Mirrors the tile exactly
  *  (`digital-clock.tsx`): 24-hour pads the hour, 12-hour doesn't and carries AM/PM. */
@@ -32,17 +39,12 @@ function formatClock(d: Date, use24Hour: boolean): string {
   return `${h12}:${minutes} ${rawHours >= 12 ? "PM" : "AM"}`;
 }
 
-/** Zone identification for the live form: abbreviation *and* offset where an abbreviation is
- *  known ("EDT GMT-4"), the offset alone otherwise. Only ~40 zones have a curated abbreviation, so
- *  the fallback is the common case, not the exception — and it must not read "GMT+7 GMT+7". */
-function zoneSuffix(city: TimezoneOption): string {
-  const abbr = getZoneAbbreviation(city.timezone);
-  return abbr ? `${abbr} ${city.gmtLabel}` : city.gmtLabel;
-}
-
 export interface ShareTextOptions {
   /** The reader's 12/24-hour preference, same flag the tiles use. */
   use24Hour: boolean;
+  /** The reader's "Time Zone Names" preference. Off omits the zone entirely; on names it exactly
+   *  as the tiles do — abbreviation where one is curated, the GMT offset otherwise. */
+  showZoneAbbr: boolean;
   /** The frozen instant for a custom-time share, or null for a live one. */
   customTime: Date | null;
   /** "Now" for a live share. Injected rather than read from the clock so the output is testable. */
@@ -61,7 +63,7 @@ export interface ShareTextOptions {
  * alone here too.
  */
 export function buildShareText(keys: string[], opts: ShareTextOptions): string {
-  const { use24Hour, customTime } = opts;
+  const { use24Hour, showZoneAbbr, customTime } = opts;
   const baseTime = customTime ?? opts.now ?? new Date();
   const live = customTime == null;
 
@@ -73,11 +75,14 @@ export function buildShareText(keys: string[], opts: ShareTextOptions): string {
 
   const segments = cities.map((city) => {
     const clock = formatClock(getTimeInCityZone(baseTime, city.offset), use24Hour);
-    return live ? `${city.name} ${clock} ${zoneSuffix(city)}` : `${city.name} ${clock}`;
+    // zoneLabel is the tiles' own helper, so the share and the screen can't drift on how a zone is
+    // named — and it already handles the ~40 curated abbreviations vs the GMT+X fallback.
+    const zone = live && showZoneAbbr ? `${zoneLabel(city, true)} ` : "";
+    return `${clock} ${zone}${city.name}`;
   });
 
   const body = segments.join(SEP);
-  return live ? `Current time in ${body}` : body;
+  return live ? `${LIVE_PREFIX}${body}` : body;
 }
 
 /**

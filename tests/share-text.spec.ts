@@ -11,20 +11,26 @@ import { blockExternal, seedZones } from "./helpers";
 const INSTANT = new Date("2026-08-01T12:00:00Z");
 
 /** At INSTANT: Tokyo +9 → 21:00, Paris +2 (CEST) → 14:00, New York −4 (EDT) → 08:00.
- *  Each city reads time → AM/PM → zone → city, with the zone present only because "Time Zone
- *  Names" ships default-ON. */
-const LIVE_TEXT =
-  "Current time — 9:00 PM JST Tokyo/2:00 PM CEST Paris/8:00 AM EDT New York City";
+ *  Cities appear as their curated three-letter share names (`CITY_ABBR`), which is share text only
+ *  — the tiles and the OG preview still spell them out. Zones are absent because the Sharing
+ *  Options popover ships "Time Zone Name" default-OFF, independently of the board's own toggle. */
+const LIVE_TEXT = "Current time — 9:00 PM TOK/2:00 PM PAR/8:00 AM NYC";
 
-/** The same board with "Time Zone Names" off — identical but for the dropped zones. */
-const LIVE_TEXT_NO_ZONES =
-  "Current time — 9:00 PM Tokyo/2:00 PM Paris/8:00 AM New York City";
+/** The same board with the popover's "Time Zone Name" turned on. */
+const LIVE_TEXT_WITH_ZONES =
+  "Current time — 9:00 PM JST TOK/2:00 PM CEST PAR/8:00 AM EDT NYC";
 
 const bar = (page: Page) => page.getByTestId("share-selection-bar");
 
-/** Turn "Time Zone Names" off before boot. The preference is written with String(bool), and the
- *  default-ON init only applies when the key is absent, so an explicit "false" opts out. */
-const zoneNamesOff = `localStorage.setItem('world-happyhour-zone-abbr', 'false');`;
+/** Seed a Sharing Option before boot. These are the popover's own keys — deliberately not the
+ *  Sidebar's `world-happyhour-zone-abbr` / `-24h`, which govern the board and no longer reach the
+ *  share text at all. */
+const shareZonesOn = `localStorage.setItem('world-happyhour-share-zone-abbr', 'true');`;
+
+async function openShareOptions(page: Page) {
+  await page.getByTestId("button-sharing-options").click();
+  await expect(page.getByTestId("sharing-options-popover")).toBeVisible();
+}
 
 function pinShareSheet() {
   return `
@@ -97,30 +103,53 @@ test.describe("the live share message", () => {
     expect(copied).toContain("z=tokyo_JP%2Cparis_FR%2CnewYorkCity_US");
   });
 
-  test("drops the zones when Time Zone Names is off", async ({ page }) => {
-    await shareAllThree(page, zoneNamesOff);
+  test("names the zones when the popover's Time Zone Name is on", async ({ page }) => {
+    await shareAllThree(page, shareZonesOn);
     await page.getByTestId("button-share-copy").click();
 
     const [text] = (await page.evaluate(() => navigator.clipboard.readText())).split("\n");
-    // The share follows the same preference the tiles do — one setting, not a share-only rule.
-    expect(text).toBe(LIVE_TEXT_NO_ZONES);
+    expect(text).toBe(LIVE_TEXT_WITH_ZONES);
+  });
+
+  test("abbreviates only the cities that have a curated short name", async ({ page }) => {
+    // Auckland is in CITY_ABBR (AUC); Ankara is deliberately not, and keeps its full name. This is
+    // the fallback that protects the ~30,300 cities the map says nothing about. Both are inside the
+    // top-500 tier, so neither forces the 2 MB full-city fetch mid-test.
+    await blockExternal(page);
+    await page.clock.setFixedTime(INSTANT);
+    await page.addInitScript(seedZones(["auckland_NZ", "ankara_TR"]));
+    await page.goto("/");
+    await page.locator("#stcm-banner").getByRole("button", { name: "Accept all" }).click();
+    await expect(page.locator("#stcm-banner")).toBeHidden();
+
+    await page.getByTestId("button-tile-menu-auckland_NZ").click();
+    await page.getByTestId("menu-share-auckland_NZ").click();
+    await page.getByTestId("clock-tile-ankara_TR").click();
+    await page.getByTestId("button-share-copy").click();
+
+    const [text] = (await page.evaluate(() => navigator.clipboard.readText())).split("\n");
+    expect(text).toContain("AUC");
+    expect(text).toContain("Ankara");
   });
 });
 
-test.describe("the Happyhour link checkbox", () => {
+test.describe("the Happyhour link toggle", () => {
   test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
-  test("defaults on, and unchecking strips the link from the clipboard", async ({ page }) => {
+  test("defaults on, and turning it off strips the link from the clipboard", async ({ page }) => {
     await shareAllThree(page);
-    const checkbox = page.getByTestId("checkbox-include-local");
-    await expect(checkbox).toHaveText(/Include Happyhour link/);
-    await expect(checkbox).toHaveAttribute("aria-pressed", "true");
-
     await page.getByTestId("button-share-copy").click();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("?z=");
 
-    await checkbox.click();
-    await expect(checkbox).toHaveAttribute("aria-pressed", "false");
+    // The testId is inherited from the checkbox this replaced, the same way "Cancel" -> "Done" kept
+    // its own — but it now lives on a switch inside the popover, so the trigger comes first.
+    await openShareOptions(page);
+    const toggle = page.getByTestId("checkbox-include-local");
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    await page.getByTestId("button-sharing-options").click();
     await page.getByTestId("button-share-copy").click();
 
     // Times only — no URL, and no trailing blank line where one used to be.
@@ -128,9 +157,11 @@ test.describe("the Happyhour link checkbox", () => {
     expect(copied).toBe(LIVE_TEXT);
   });
 
-  test("unchecking omits the url field from the share sheet entirely", async ({ page }) => {
+  test("turning it off omits the url field from the share sheet entirely", async ({ page }) => {
     await shareAllThree(page);
+    await openShareOptions(page);
     await page.getByTestId("checkbox-include-local").click();
+    await page.getByTestId("button-sharing-options").click();
     await page.getByTestId("button-share-commit").click();
 
     const shared = await page.evaluate(() => (window as any).__shared);
@@ -139,6 +170,69 @@ test.describe("the Happyhour link checkbox", () => {
     // Absent, not empty: `url: null` isn't valid ShareData and an empty string can render as a
     // stray link in some targets.
     expect(shared[0]).not.toHaveProperty("url");
+  });
+});
+
+test.describe("the Sharing Options popover", () => {
+  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+
+  test("the trigger both opens and dismisses it, and so does the X", async ({ page }) => {
+    await shareAllThree(page);
+    const popover = page.getByTestId("sharing-options-popover");
+
+    await openShareOptions(page);
+    await page.getByTestId("button-sharing-options").click();
+    await expect(popover).toBeHidden();
+
+    await openShareOptions(page);
+    await page.getByTestId("button-sharing-options-close").click();
+    await expect(popover).toBeHidden();
+  });
+
+  test("Escape closes the popover without leaving share select-mode", async ({ page }) => {
+    // The page has a document-level Escape listener that tears down the whole bar. Same family as
+    // the time-picker Escape interaction guarded in time-picker.spec.ts.
+    await shareAllThree(page);
+    await openShareOptions(page);
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("sharing-options-popover")).toBeHidden();
+    await expect(bar(page)).toBeVisible();
+
+    // And a second Escape, with the popover already shut, still leaves select-mode as before.
+    await page.keyboard.press("Escape");
+    await expect(bar(page)).toBeHidden();
+  });
+
+  test("the settings are remembered across a reload", async ({ page }) => {
+    await shareAllThree(page);
+    await openShareOptions(page);
+    await page.getByTestId("toggle-share-24h").click();
+    await page.getByTestId("toggle-share-zone-abbr").click();
+    await page.getByTestId("checkbox-include-local").click();
+
+    await page.reload();
+    await page.getByTestId("button-tile-menu-paris_FR").click();
+    await page.getByTestId("menu-share-paris_FR").click();
+    await openShareOptions(page);
+
+    await expect(page.getByTestId("toggle-share-24h")).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByTestId("toggle-share-zone-abbr")).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByTestId("checkbox-include-local")).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("its 24-hour setting governs the share while the board stays 12-hour", async ({ page }) => {
+    // The decoupling, asserted directly: this is the whole reason the popover exists.
+    await shareAllThree(page);
+    await openShareOptions(page);
+    await page.getByTestId("toggle-share-24h").click();
+    await page.getByTestId("button-sharing-options").click();
+    await page.getByTestId("button-share-copy").click();
+
+    const [text] = (await page.evaluate(() => navigator.clipboard.readText())).split("\n");
+    expect(text).toBe("Current time — 21:00 TOK/14:00 PAR/08:00 NYC");
+    // The Sidebar's own 24-Hour Clock was never touched, so the hero still reads 12-hour.
+    await expect(page.getByTestId("text-hero-time")).toContainText(/AM|PM/);
   });
 });
 
@@ -175,7 +269,7 @@ test.describe("the custom-time share message", () => {
     expect(text).not.toContain("JST");
     // Still every city, still east-to-west, still one clock face each — now time-first.
     expect(text).toMatch(
-      /^\d{1,2}:\d{2} [AP]M Tokyo\/\d{1,2}:\d{2} [AP]M Paris\/\d{1,2}:\d{2} [AP]M New York City$/
+      /^\d{1,2}:\d{2} [AP]M TOK\/\d{1,2}:\d{2} [AP]M PAR\/\d{1,2}:\d{2} [AP]M NYC$/
     );
   });
 });

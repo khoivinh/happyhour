@@ -229,6 +229,216 @@ export function getZoneAbbreviation(timezone: string): string | null {
   return null;
 }
 
+/** Three-letter names for cities in *shared message text only* — never on the tiles, which always
+ *  show the full name. A shared message is scanned in a chat thread, where "8:00 AM EDT NYC" carries
+ *  further than the full string; the board is read deliberately, where it doesn't.
+ *
+ *  Curated, and deliberately partial — 168 of 30,481 cities. Anything absent keeps its full name via
+ *  the `??` in `shareCityName`, so an omission costs nothing and a bad guess costs a lot. The rules,
+ *  in priority order (see docs/2026-08-08-devlog.md and the Obsidian list it was reviewed in):
+ *
+ *    1. Intuitive beats official. TOR for Toronto, never YYZ — but LAX, SFO and PHL are fine,
+ *       because those codes already read as their cities.
+ *    2. Prefer the name's own first three letters where unambiguous.
+ *    3. Airport/IATA codes only where already read as the city. Never opaque ones (SCL, BOM, MAA).
+ *    4. Established civilian shorthand beats both: NYC, RIO, BKK, CPH, TLV.
+ *    5. Exactly three characters, so LA -> LAX and HK -> HKG.
+ *    6. Contested forms go to nobody. Chennai and Chengdu both want CHE and neither is decisive, so
+ *       neither is listed; same for Shenzhen/Shenyang on SHE.
+ *    7. No abbreviation beats a bad one — most Chinese and Indian tier-2 cities have no intuitive
+ *       reduction for a non-local reader, and are absent on purpose.
+ *
+ *  Keyed by city key, not display name: the dataset stores "New York City", and five different
+ *  cities are called "Washington". Note too that several cities are stored — and shown on the
+ *  tiles — under local names (Zürich, Genève, Köln, Montréal). An abbreviation has to read against
+ *  the label the user actually sees, which is why Köln is absent (COL derives from "Cologne", a
+ *  string that never appears on screen, and KOL is Kolkata's) while Genève keeps GVA. */
+const CITY_ABBR: Record<string, string> = {
+  // United States
+  newYorkCity_US:            "NYC",
+  losAngeles_US:             "LAX",
+  chicago_US:                "CHI",
+  sanFrancisco_US:           "SFO",
+  washington_US:             "WDC",
+  boston_US:                 "BOS",
+  seattle_US:                "SEA",
+  miami_US:                  "MIA",
+  atlanta_US:                "ATL",
+  denver_US:                 "DEN",
+  dallas_US:                 "DAL",
+  houston_US:                "HOU",
+  austin_US:                 "AUS",
+  philadelphia_US:           "PHL",
+  phoenix_US:                "PHX",
+  lasVegas_US:               "LAS",
+  sanDiego_US:               "SAN",
+  portland_US:               "PDX",
+  detroit_US:                "DET",
+  honolulu_US:               "HNL",
+  saltLakeCity_US:           "SLC",
+  minneapolis_US:            "MSP",
+  newOrleans_US:             "NOL",
+  nashville_US:              "NSH",
+  sanJose_US:                "SJC",
+  // Canada
+  toronto_CA:                "TOR",
+  vancouver_CA:              "VAN",
+  montreal_CA:               "MTL",  // Montréal
+  calgary_CA:                "CAL",
+  ottawa_CA:                 "OTT",
+  // Latin America
+  mexicoCity_MX:             "MEX",
+  guadalajara_MX:            "GDL",
+  monterrey_MX:              "MTY",
+  saoPaulo_BR:               "SAO",  // São Paulo
+  riodeJaneiro_BR:           "RIO",
+  brasilia_BR:               "BSB",  // Brasília
+  buenosAires_AR:            "BUE",
+  santiago_CL:               "SGO",
+  lima_PE:                   "LIM",
+  bogota_CO:                 "BOG",  // Bogotá
+  medellin_CO:               "MDE",  // Medellín
+  caracas_VE:                "CCS",
+  quito_EC:                  "QUI",
+  havana_CU:                 "HAV",
+  panama_PA:                 "PAN",  // Panamá
+  guatemalaCity_GT:          "GUA",
+  montevideo_UY:             "MVD",
+  // Europe
+  london_GB:                 "LON",
+  paris_FR:                  "PAR",
+  berlin_DE:                 "BER",
+  madrid_ES:                 "MAD",
+  barcelona_ES:              "BCN",
+  rome_IT:                   "ROM",
+  milan_IT:                  "MIL",
+  naples_IT:                 "NAP",
+  amsterdam_NL:              "AMS",
+  rotterdam_NL:              "ROT",
+  brussels_BE:               "BRU",
+  antwerpen_BE:              "ANT",
+  zuerich_CH:                "ZUR",  // Zürich
+  geneve_CH:                 "GVA",  // Genève
+  munich_DE:                 "MUN",
+  frankfurtamMain_DE:        "FRA",
+  hamburg_DE:                "HAM",
+  duesseldorf_DE:            "DUS",  // Düsseldorf
+  vienna_AT:                 "VIE",
+  dublin_IE:                 "DUB",
+  edinburgh_GB:              "EDI",
+  glasgow_GB:                "GLA",
+  manchester_GB:             "MAN",
+  lisbon_PT:                 "LIS",
+  porto_PT:                  "POR",
+  sevilla_ES:                "SEV",
+  valencia_ES:               "VLC",
+  marseille_FR:              "MRS",
+  nice_FR:                   "NCE",
+  stockholm_SE:              "STO",
+  goeteborg_SE:              "GOT",  // Göteborg
+  copenhagen_DK:             "CPH",
+  oslo_NO:                   "OSL",
+  helsinki_FI:               "HEL",
+  reykjavik_IS:              "REY",  // Reykjavík
+  warsaw_PL:                 "WAW",
+  prague_CZ:                 "PRG",
+  budapest_HU:               "BUD",
+  bucharest_RO:              "BUC",
+  belgrade_RS:               "BEL",
+  athens_GR:                 "ATH",
+  istanbul_TR:               "IST",
+  moscow_RU:                 "MOS",
+  saintPetersburg_RU:        "SPB",
+  kyiv_UA:                   "KYI",
+  luxembourg_LU:             "LUX",
+  // Middle East & Africa
+  dubai_AE:                  "DXB",
+  abuDhabi_AE:               "ABU",
+  doha_QA:                   "DOH",
+  riyadh_SA:                 "RIY",
+  jeddah_SA:                 "JED",
+  telAviv_IL:                "TLV",
+  jerusalem_IL:              "JER",
+  beirut_LB:                 "BEY",
+  amman_JO:                  "AMM",
+  kuwaitCity_KW:             "KUW",
+  muscat_OM:                 "MUS",
+  tehran_IR:                 "TEH",
+  baghdad_IQ:                "BAG",
+  cairo_EG:                  "CAI",
+  casablanca_MA:             "CAS",
+  marrakesh_MA:              "MAR",
+  algiers_DZ:                "ALG",
+  tunis_TN:                  "TUN",
+  lagos_NG:                  "LAG",
+  nairobi_KE:                "NAI",
+  johannesburg_ZA:           "JNB",
+  capeTown_ZA:               "CPT",
+  accra_GH:                  "ACC",
+  dakar_SN:                  "DAK",
+  addisAbaba_ET:             "ADD",
+  kinshasa_CD:               "KIN",
+  // Asia
+  tokyo_JP:                  "TOK",
+  osaka_JP:                  "OSA",
+  kyoto_JP:                  "KYO",
+  nagoya_JP:                 "NAG",
+  sapporo_JP:                "SAP",
+  fukuoka_JP:                "FUK",
+  yokohama_JP:               "YOK",
+  seoul_KR:                  "SEO",
+  busan_KR:                  "BUS",
+  beijing_CN:                "BEI",
+  shanghai_CN:               "SHA",
+  hongKong_HK:               "HKG",
+  taipei_TW:                 "TPE",
+  singapore_SG:              "SIN",
+  bangkok_TH:                "BKK",
+  jakarta_ID:                "JKT",
+  kualaLumpur_MY:            "KUL",
+  manila_PH:                 "MNL",
+  hoChiMinhCity_VN:          "HCM",
+  hanoi_VN:                  "HAN",
+  phnomPenh_KH:              "PNH",
+  yangon_MM:                 "YAN",
+  delhi_IN:                  "DEL",
+  mumbai_IN:                 "MUM",
+  bengaluru_IN:              "BLR",
+  kolkata_IN:                "KOL",
+  hyderabad_IN:              "HYD",
+  pune_IN:                   "PUN",
+  ahmedabad_IN:              "AHM",
+  karachi_PK:                "KAR",
+  lahore_PK:                 "LAH",
+  islamabad_PK:              "ISB",
+  dhaka_BD:                  "DHA",
+  colombo_LK:                "CMB",
+  kathmandu_NP:              "KTM",
+  almaty_KZ:                 "ALA",
+  tashkent_UZ:               "TAS",
+  baku_AZ:                   "BAK",
+  tbilisi_GE:                "TBS",
+  ulanBator_MN:              "ULA",
+  kabul_AF:                  "KAB",
+  // Oceania
+  sydney_AU:                 "SYD",
+  melbourne_AU:              "MEL",
+  brisbane_AU:               "BRI",
+  perth_AU:                  "PER",
+  adelaide_AU:               "ADL",
+  auckland_NZ:               "AUC",
+  wellington_NZ:             "WEL",
+  christchurch_NZ:           "CHC",
+};
+
+/** The name a city goes by in a shared message: its curated three-letter form, or its full name.
+ *  Share text only — the tiles and the OG preview card (`functions/lib/preview.ts`) both keep full
+ *  names, the card because a link-preview headline has room and clarity there is worth more than
+ *  brevity. */
+export function shareCityName(city: TimezoneOption): string {
+  return CITY_ABBR[city.key] ?? city.name;
+}
+
 /** The tile meta-line label: the zone abbreviation when "Time Zone Names" is on and one exists,
  *  else the GMT-offset label. Keeps the three tile call sites from repeating the fallback. */
 export function zoneLabel(city: TimezoneOption, showZoneAbbr: boolean): string {

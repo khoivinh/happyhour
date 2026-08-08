@@ -1,12 +1,16 @@
-import { Check } from "lucide-react";
 import { CommitBar, CommitBarActions, CommitBarButton } from "@/components/commit-bar";
+import { SharingOptionsPopover, type ShareOptions } from "@/components/sharing-options-popover";
 
 interface ShareSelectionBarProps {
   /** Number of cities that will be shared (selected tiles + local city if included). */
   count: number;
-  /** Whether the happyhour.day link rides along with the message. Defaults on. */
-  includeLink: boolean;
-  onToggleIncludeLink: () => void;
+  /** The three settings that govern the message — 12/24-hour, zone names, and whether the
+   *  happyhour.day link rides along. Independent of the Sidebar's same-named view preferences. */
+  shareOptions: ShareOptions;
+  onChangeShareOptions: (patch: Partial<ShareOptions>) => void;
+  /** Lifted so the page can tell whether Escape should close the popover or leave share mode. */
+  optionsOpen: boolean;
+  onOptionsOpenChange: (open: boolean) => void;
   onCancel: () => void;
   onShare: () => void;
   onCopyLink: () => void;
@@ -29,8 +33,10 @@ interface ShareSelectionBarProps {
  */
 export function ShareSelectionBar({
   count,
-  includeLink,
-  onToggleIncludeLink,
+  shareOptions,
+  onChangeShareOptions,
+  optionsOpen,
+  onOptionsOpenChange,
   onCancel,
   onShare,
   onCopyLink,
@@ -41,27 +47,15 @@ export function ShareSelectionBar({
 
   return (
     <CommitBar testId="share-selection-bar">
-      {/* Governs the link, not the local city — that moved to the hero clock's own ⋯ menu and
-          select check. The testId keeps its original name so specs and analytics stay put, the
-          same way "Cancel" → "Done" did. */}
-      <button
-        type="button"
-        onClick={onToggleIncludeLink}
-        className="flex items-center gap-2.5 text-sm font-medium text-[var(--share-bar-fg)]"
-        aria-pressed={includeLink}
-        data-testid="checkbox-include-local"
-      >
-        <span
-          className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md border-2 transition-colors ${
-            includeLink
-              ? "border-[var(--share-bar-accent)] bg-[var(--share-bar-accent)] text-[var(--share-bar-accent-fg)]"
-              : "border-[var(--share-bar-fg)]"
-          }`}
-        >
-          {includeLink && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-        </span>
-        Include Happyhour link
-      </button>
+      {/* Replaced the lone "Include Happyhour link" checkbox (2026-08-08). That checkbox governed
+          one of three things that shape a share; the other two were being read off the Sidebar,
+          where they describe the user's own board instead. */}
+      <SharingOptionsPopover
+        open={optionsOpen}
+        onOpenChange={onOptionsOpenChange}
+        options={shareOptions}
+        onChange={onChangeShareOptions}
+      />
 
       <CommitBarActions>
         {/* Reads "Done", not "Cancel": leaving select-mode keeps the board exactly as it was, so

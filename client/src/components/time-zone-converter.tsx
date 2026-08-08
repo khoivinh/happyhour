@@ -29,6 +29,7 @@ import { cacheTileMetadata, getCityOrCachedTile } from "@/lib/tile-cache";
 import { resolveLocalCity } from "@/lib/closest-city";
 import { track } from "@/lib/analytics";
 import { ShareSelectionBar } from "@/components/share-selection-bar";
+import type { ShareOptions } from "@/components/sharing-options-popover";
 
 // Track recent touch events so we can suppress synthetic mouse events on mobile.
 // Browsers fire mousedown ~0-100ms after touchstart; if MouseSensor activates on
@@ -222,6 +223,15 @@ const STORAGE_KEY = "world-happyhour-zones";
 // count as "already onboarded", so only a genuinely new visitor sees the tagline.
 const ONBOARDED_KEY = "world-happyhour-onboarded";
 
+// Sharing Options. Deliberately separate keys from the Sidebar's `world-happyhour-24h` /
+// `-zone-abbr`: those describe the user's own board, these describe the message, and conflating
+// them is the coupling this popover exists to break. Both 12-hour and no-zone-name are the defaults
+// here even though the board defaults zone names *on* — a share should be plain unless asked
+// otherwise, whereas a dashboard you look at all day can afford the extra label.
+const SHARE_24H_KEY = "world-happyhour-share-24h";
+const SHARE_ZONE_ABBR_KEY = "world-happyhour-share-zone-abbr";
+const SHARE_LINK_KEY = "world-happyhour-share-link";
+
 /** Sort comparator: easternmost first, i.e. descending UTC offset. Shared by the "Sort East to
  *  West" board preference and the share set, so both mean the same thing by the phrase.
  *
@@ -360,9 +370,29 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   // Whether the local (hero) city rides along. Driven by the hero's own ⋯ menu and select check,
   // not by the bottom bar — the bar's checkbox now governs the link instead.
   const [includeLocal, setIncludeLocal] = useState(false);
-  // Whether the happyhour.day link is attached. Defaults on: a share without the link is the
-  // exception (times only, for somewhere a URL would be noise), not the norm.
-  const [includeLink, setIncludeLink] = useState(true);
+  // The three settings that shape the message, remembered across sessions. `includeLink` defaults
+  // on — a share without the link is the exception (times only, where a URL would be noise), not
+  // the norm — so it branches on `null` rather than `=== "true"`, or every returning visitor would
+  // silently lose the link. Same idiom as the board's zone-abbr pref in world-clock.tsx.
+  const [shareOptions, setShareOptions] = useState<ShareOptions>(() => {
+    const storedLink = localStorage.getItem(SHARE_LINK_KEY);
+    return {
+      use24Hour: localStorage.getItem(SHARE_24H_KEY) === "true",
+      showZoneAbbr: localStorage.getItem(SHARE_ZONE_ABBR_KEY) === "true",
+      includeLink: storedLink === null ? true : storedLink === "true",
+    };
+  });
+  const [shareOptionsOpen, setShareOptionsOpen] = useState(false);
+
+  const changeShareOptions = useCallback((patch: Partial<ShareOptions>) => {
+    setShareOptions((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(SHARE_24H_KEY, String(shareOptions.use24Hour));
+    localStorage.setItem(SHARE_ZONE_ABBR_KEY, String(shareOptions.showZoneAbbr));
+    localStorage.setItem(SHARE_LINK_KEY, String(shareOptions.includeLink));
+  }, [shareOptions]);
   // Read once, not per render: a browser doesn't grow a share sheet mid-session, and the bar's
   // shape shouldn't depend on when React happens to re-render.
   const [canNativeShare] = useState(
@@ -380,7 +410,8 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
   const enterShareMode = useCallback((seedKey: string | null, withLocal = false) => {
     setShareSelection(seedKey ? new Set([seedKey]) : new Set());
     setIncludeLocal(withLocal);
-    setIncludeLink(true);
+    // Deliberately does *not* reset shareOptions: they're remembered across sessions now, and a
+    // preference that resets every time you open the bar isn't remembered.
     setLinkCopied(false);
     setShareMode(true);
     track("share_started");
@@ -399,7 +430,7 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     setShareMode(false);
     setShareSelection(new Set());
     setIncludeLocal(false);
-    setIncludeLink(true);
+    setShareOptionsOpen(false);
   }, []);
 
   // Report select-mode up to the page so it can gray out the drawer toggle (a sibling above us).
@@ -407,15 +438,18 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     onShareModeChange?.(shareMode);
   }, [shareMode, onShareModeChange]);
 
-  // Esc exits select mode (matches the bottom bar's Cancel).
+  // Esc exits select mode (matches the bottom bar's Cancel) — unless the Sharing Options popover is
+  // open, in which case Escape belongs to the popover and tearing down the whole bar underneath it
+  // would be a surprise. Radix also stops propagation on its side; this guard is the belt to that
+  // brace, and covers the frame between the popover closing and `shareOptionsOpen` catching up.
   useEffect(() => {
-    if (!shareMode) return;
+    if (!shareMode || shareOptionsOpen) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") cancelShareMode();
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [shareMode, cancelShareMode]);
+  }, [shareMode, shareOptionsOpen, cancelShareMode]);
 
   // (Footer clearance while the bar is up is reserved by CommitBar itself, on mount.)
 
@@ -446,16 +480,19 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
    *  the moment it was actually sent. */
   const buildShareMessage = useCallback(() => {
     const url = buildShareUrl();
+    // Reads the Sharing Options, never the Sidebar's `use24Hour` / `showZoneAbbr` props — those
+    // describe the user's own board, and letting them reach in here is exactly the coupling the
+    // popover was added to break. The props are still passed to this component for the tiles.
     const text = buildShareText(shareKeys, {
-      use24Hour,
-      showZoneAbbr,
+      use24Hour: shareOptions.use24Hour,
+      showZoneAbbr: shareOptions.showZoneAbbr,
       customTime: isCustomMode && selectedTime ? selectedTime : null,
     });
     // With the link off the message is the times and nothing else — the share sheet gets no `url`
     // field at all rather than an empty one, so a target can't render a stray blank link.
-    if (!includeLink) return { url: null, text, payload: text };
+    if (!shareOptions.includeLink) return { url: null, text, payload: text };
     return { url, text, payload: buildSharePayload(text, url) };
-  }, [buildShareUrl, shareKeys, use24Hour, showZoneAbbr, isCustomMode, selectedTime, includeLink]);
+  }, [buildShareUrl, shareKeys, shareOptions, isCustomMode, selectedTime]);
 
   /** Hand the link to the OS share sheet. Only reachable where `navigator.share` exists — the bar
    *  hides Share otherwise rather than quietly turning it into a second Copy Link. */
@@ -994,8 +1031,10 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
       {shareMode && (
         <ShareSelectionBar
           count={shareKeys.length}
-          includeLink={includeLink}
-          onToggleIncludeLink={() => setIncludeLink((v) => !v)}
+          shareOptions={shareOptions}
+          onChangeShareOptions={changeShareOptions}
+          optionsOpen={shareOptionsOpen}
+          onOptionsOpenChange={setShareOptionsOpen}
           onCancel={cancelShareMode}
           onShare={commitShare}
           onCopyLink={copyShareLink}

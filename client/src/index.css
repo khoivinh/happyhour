@@ -385,6 +385,84 @@
   }
 }
 
+/* Sharing Options popover — the Sidebar's reveal, re-aimed.
+   Same clip-path-inset technique and same easing as sidebar-open/close above, with two changes: the
+   origin moves to the *bottom-left* corner (where the "Sharing Options" trigger sits, so the panel
+   appears to grow up out of the button rather than down from a drawer icon), and it runs faster —
+   this is a three-row menu, not a full-height drawer.
+
+   Applied to the inner surface, never to PopoverContent itself: the pointer tail is a sibling that
+   extends past the surface's border box, and inset(0 0 0 0) would sever it. */
+@keyframes sharing-options-open {
+  0% {
+    opacity: 0;
+    clip-path: inset(calc(100% - 40px) calc(100% - 92px) 0 0 round 12px);
+  }
+  30% {
+    opacity: 1;
+    clip-path: inset(calc(100% - 40px) calc(100% - 92px) 0 0 round 12px);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 15px);
+  }
+}
+
+@keyframes sharing-options-close {
+  0% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 15px);
+  }
+  70% {
+    opacity: 1;
+    clip-path: inset(calc(100% - 40px) calc(100% - 92px) 0 0 round 12px);
+  }
+  100% {
+    opacity: 0;
+    clip-path: inset(calc(100% - 40px) calc(100% - 92px) 0 0 round 12px);
+  }
+}
+
+/* The tail fades rather than growing — clipping it would fight the surface's own animation. */
+@keyframes sharing-options-tail-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sharing-options-surface {
+  animation: sharing-options-open 220ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+[data-state="closed"] .sharing-options-surface {
+  animation: sharing-options-close 160ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+.sharing-options-tail {
+  animation: sharing-options-tail-in 220ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+[data-state="closed"] .sharing-options-tail {
+  animation: sharing-options-tail-in 160ms cubic-bezier(0.32, 0.72, 0, 1) reverse forwards;
+}
+
+/* The rows cross-fade in behind the expansion, the same beat the Sidebar uses. */
+.sharing-options-rows {
+  animation: sharing-options-tail-in 200ms ease-out 90ms both;
+}
+[data-state="closed"] .sharing-options-rows {
+  animation: none;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sharing-options-surface,
+  [data-state="closed"] .sharing-options-surface,
+  .sharing-options-tail,
+  [data-state="closed"] .sharing-options-tail,
+  .sharing-options-rows {
+    animation: none;
+    clip-path: none;
+    opacity: 1;
+  }
+}
+
 /* Offline banner — theme-aware colors. Defaults to light-mode yellow band (Figma 232-3492).
    Dark: dimmed amber band + near-white text. Happy: dark band + Happy yellow (page is #FFD900). */
 .offline-banner {

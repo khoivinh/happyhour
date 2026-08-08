@@ -1,6 +1,7 @@
 import {
   getCityByKey,
   getTimeInCityZone,
+  shareCityName,
   zoneLabel,
   type TimezoneOption,
 } from "@/lib/city-lookup";
@@ -14,8 +15,11 @@ import {
  * reader scans several at once; the city name is the label, not the lead.
  *
  * Two shapes, matching the two kinds of share:
- *   custom  "3:00 PM New York City/9:00 PM Paris/12:30 AM Bengaluru"
- *   live    "Current time — 3:00 PM EDT New York City/9:00 PM CEST Paris"
+ *   custom  "3:00 PM NYC/9:00 PM PAR/12:30 AM BLR"
+ *   live    "Current time — 3:00 PM EDT NYC/9:00 PM CEST PAR"
+ *
+ * City names are abbreviated where a curated three-letter form exists (`shareCityName`); everywhere
+ * else — the tiles, the preview card — they stay spelled out.
  *
  * A custom share is a conversion — the instant is fixed and the zones are implied by the cities,
  * so naming them would be noise. A live share is a snapshot of *now*, where the zone tells the
@@ -78,7 +82,9 @@ export function buildShareText(keys: string[], opts: ShareTextOptions): string {
     // zoneLabel is the tiles' own helper, so the share and the screen can't drift on how a zone is
     // named — and it already handles the ~40 curated abbreviations vs the GMT+X fallback.
     const zone = live && showZoneAbbr ? `${zoneLabel(city, true)} ` : "";
-    return `${clock} ${zone}${city.name}`;
+    // shareCityName, not city.name: a curated three-letter form where one exists, the full name
+    // otherwise. Only the message abbreviates — the tiles and the preview card stay spelled out.
+    return `${clock} ${zone}${shareCityName(city)}`;
   });
 
   const body = segments.join(SEP);

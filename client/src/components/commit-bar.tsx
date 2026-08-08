@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ComponentPropsWithoutRef, ReactNode, forwardRef, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /** Height of Silktide's cookie banner, or 0 when it isn't up.
@@ -52,9 +52,12 @@ function useConsentBannerHeight() {
 function useCommitBarClearance(extra: number) {
   useEffect(() => {
     const prev = document.body.style.paddingBottom;
-    // The bar stacks into two rows below the sm breakpoint, so it's taller on mobile.
+    // The bar stacks into two rows below the sm breakpoint, so it's taller on mobile. The mobile
+    // figure went 132 -> 154 on 2026-08-08: the Sharing Options trigger is a full-height button
+    // (~44px) where the old "Include Happyhour link" checkbox was ~22px, and only the stacked
+    // layout pays for that — on desktop the action buttons already set the row's height.
     const isDesktop = window.matchMedia("(min-width: 640px)").matches;
-    document.body.style.paddingBottom = `${(isDesktop ? 104 : 132) + extra}px`;
+    document.body.style.paddingBottom = `${(isDesktop ? 104 : 154) + extra}px`;
     return () => {
       document.body.style.paddingBottom = prev;
     };
@@ -111,21 +114,21 @@ const VARIANTS: Record<Variant, string> = {
   primary: "bg-[var(--share-bar-accent)] text-[var(--share-bar-accent-fg)]",
 };
 
-export function CommitBarButton({
-  variant,
-  onClick,
-  disabled,
-  children,
-  testId,
-}: {
-  variant: Variant;
-  onClick: () => void;
-  disabled?: boolean;
-  children: ReactNode;
-  testId?: string;
-}) {
+/** Forwards its ref and spreads the rest so a Radix `asChild` trigger can drive it — that's how the
+ *  Sharing Options popover gets Copy Link's exact gray by construction instead of by copied hex. */
+export const CommitBarButton = forwardRef<
+  HTMLButtonElement,
+  {
+    variant: Variant;
+    onClick?: () => void;
+    disabled?: boolean;
+    children: ReactNode;
+    testId?: string;
+  } & Omit<ComponentPropsWithoutRef<"button">, "onClick" | "disabled" | "children" | "className">
+>(({ variant, onClick, disabled, children, testId, ...rest }, ref) => {
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onClick}
       disabled={disabled}
@@ -134,8 +137,10 @@ export function CommitBarButton({
         VARIANTS[variant]
       )}
       data-testid={testId}
+      {...rest}
     >
       {children}
     </button>
   );
-}
+});
+CommitBarButton.displayName = "CommitBarButton";

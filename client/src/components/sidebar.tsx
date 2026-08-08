@@ -4,45 +4,12 @@ import { SignInButton, SignOutButton, useUser, useAuth } from "@clerk/clerk-reac
 import { useTheme } from "@/lib/theme-provider";
 import { track } from "@/lib/analytics";
 import type { SyncStatus } from "@/hooks/use-cloud-sync";
+import { ToggleSwitch } from "@/components/toggle-switch";
 import { DrawerOpenIcon } from "@/components/icons/drawer-open";
 import { DrawerClosedIcon } from "@/components/icons/drawer-closed";
 import { HappyModeIcon } from "@/components/icons/happy-mode-icon";
 
 const isClerkConfigured = !!import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-
-interface ToggleSwitchProps {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  /** Inert + grayed. Used where the setting has no effect on the current view (e.g. Relative Time
-   *  in the Sharing View, where the viewer's own time isn't on screen to be relative to). */
-  disabled?: boolean;
-}
-
-function ToggleSwitch({ checked, onChange, disabled = false }: ToggleSwitchProps) {
-  return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      aria-disabled={disabled || undefined}
-      onClick={() => !disabled && onChange(!checked)}
-      className={`relative w-[33px] h-[18px] rounded-full border transition-colors duration-200 shrink-0 bg-transparent ${
-        disabled ? "opacity-40 cursor-not-allowed " : ""
-      }${
-        checked
-          ? "border-[#22c55e]"
-          : "border-[#6b7280]"
-      }`}
-    >
-      <span
-        className={`absolute left-0 top-[2px] w-[12px] h-[12px] rounded-full transition-transform duration-200 ${
-          checked
-            ? "translate-x-[17px] bg-[#22c55e]"
-            : "translate-x-[2px] bg-[#6b7280]"
-        }`}
-      />
-    </button>
-  );
-}
 
 function DrawerToggleIcon({ open }: { open: boolean }) {
   return open ? <DrawerOpenIcon /> : <DrawerClosedIcon />;

@@ -49,19 +49,28 @@ function useConsentBannerHeight() {
  *  `extra` is the consent banner's height: while it's up the bar rides that much higher, so the
  *  page owes that much more room. Re-running on `extra` is safe because React runs the cleanup
  *  before the next effect, so `prev` re-reads the untouched original each time. */
-function useCommitBarClearance(extra: number) {
+function useCommitBarClearance(bar: HTMLElement | null, extra: number) {
   useEffect(() => {
     const prev = document.body.style.paddingBottom;
-    // The bar stacks into two rows below the sm breakpoint, so it's taller on mobile. The mobile
-    // figure went 132 -> 154 on 2026-08-08: the Sharing Options trigger is a full-height button
-    // (~44px) where the old "Include Happyhour link" checkbox was ~22px, and only the stacked
-    // layout pays for that — on desktop the action buttons already set the row's height.
-    const isDesktop = window.matchMedia("(min-width: 640px)").matches;
-    document.body.style.paddingBottom = `${(isDesktop ? 104 : 154) + extra}px`;
+    if (!bar) return;
+    // Measured, not hardcoded. This used to be a desktop/mobile pair of magic numbers, which stopped
+    // being answerable on 2026-08-08: ShareSelectionBar now holds a single row on mobile (~68px)
+    // while the Sharing View's and Registration bars still stack (~132px), so no one constant is
+    // right for all three. The bar is rendered right here, so measure it — and a ResizeObserver
+    // also catches the label reflowing and the `Share 3` -> `Share 16` width change for free.
+    const apply = () => {
+      // 16px is the wrapper's own pb-4 below the bar; `extra` is the consent banner's height, which
+      // the bar rides above while it's up, so the page owes that much more room.
+      document.body.style.paddingBottom = `${bar.getBoundingClientRect().height + 16 + extra}px`;
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(bar);
     return () => {
+      ro.disconnect();
       document.body.style.paddingBottom = prev;
     };
-  }, [extra]);
+  }, [bar, extra]);
 }
 
 /**
@@ -75,10 +84,25 @@ function useCommitBarClearance(extra: number) {
  * how the two would quietly diverge.
  *
  * Mounting it reserves the footer clearance; unmounting gives it back.
+ *
+ * `singleRow` opts out of the mobile stack. It is opt-in rather than the default because only
+ * `ShareSelectionBar` can afford it: its left slot is a button, while `ShareImportBar` and
+ * `RegistrationBar` put a ~250px sentence there ("Room for 4 more — Happyhour holds 16.") beside
+ * labels like "Login or Sign Up". Forcing those onto one row wraps the sentence to three lines and
+ * makes the bar *taller*, which is the opposite of the point.
  */
-export function CommitBar({ children, testId }: { children: ReactNode; testId?: string }) {
+export function CommitBar({
+  children,
+  testId,
+  singleRow = false,
+}: {
+  children: ReactNode;
+  testId?: string;
+  singleRow?: boolean;
+}) {
   const consentHeight = useConsentBannerHeight();
-  useCommitBarClearance(consentHeight);
+  const [bar, setBar] = useState<HTMLElement | null>(null);
+  useCommitBarClearance(bar, consentHeight);
   return (
     <div
       className="fixed inset-x-0 z-50 px-6 pb-4 transition-[bottom] duration-200 ease-out motion-reduce:transition-none md:px-12 lg:px-24"
@@ -86,8 +110,16 @@ export function CommitBar({ children, testId }: { children: ReactNode; testId?: 
       data-consent-offset={consentHeight || undefined}
     >
       <div
-        className="mx-auto flex max-w-4xl flex-col items-start gap-3 rounded-[14px] border border-[color:var(--share-bar-border)] bg-[var(--share-bar-bg)] px-4 py-3 text-[var(--share-bar-fg)] shadow-[0_-1px_3px_rgba(0,0,0,0.06),0_10px_30px_-10px_rgba(0,0,0,0.35)] animate-in fade-in slide-in-from-bottom-4 duration-200 ease-out motion-reduce:animate-none sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+        ref={setBar}
+        className={cn(
+          "mx-auto flex max-w-4xl rounded-[14px] border border-[color:var(--share-bar-border)] bg-[var(--share-bar-bg)] py-3 text-[var(--share-bar-fg)] shadow-[0_-1px_3px_rgba(0,0,0,0.06),0_10px_30px_-10px_rgba(0,0,0,0.35)] animate-in fade-in slide-in-from-bottom-4 duration-200 ease-out motion-reduce:animate-none sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4",
+          // Tighter gutter below sm in single-row mode: the four controls need every pixel at 390px.
+          singleRow
+            ? "flex-row items-center justify-between gap-2 px-3"
+            : "flex-col items-start gap-3 px-4"
+        )}
         data-testid={testId}
+        data-single-row={singleRow || undefined}
       >
         {children}
       </div>
@@ -95,9 +127,25 @@ export function CommitBar({ children, testId }: { children: ReactNode; testId?: 
   );
 }
 
-/** Right-hand action cluster. Full width on mobile so the buttons reach the bar's edges. */
-export function CommitBarActions({ children }: { children: ReactNode }) {
-  return <div className="flex w-full items-center justify-end gap-2 sm:w-auto">{children}</div>;
+/** Right-hand action cluster. Full width on mobile so the buttons reach the bar's edges — except in
+ *  `singleRow` mode, where claiming the full width would shove the left slot off the bar. */
+export function CommitBarActions({
+  children,
+  singleRow = false,
+}: {
+  children: ReactNode;
+  singleRow?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-end gap-2 sm:w-auto",
+        singleRow ? "w-auto" : "w-full"
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 /** Three tiers of emphasis, so the rightmost filled pill is always *the* action:
@@ -124,8 +172,9 @@ export const CommitBarButton = forwardRef<
     disabled?: boolean;
     children: ReactNode;
     testId?: string;
+    className?: string;
   } & Omit<ComponentPropsWithoutRef<"button">, "onClick" | "disabled" | "children" | "className">
->(({ variant, onClick, disabled, children, testId, ...rest }, ref) => {
+>(({ variant, onClick, disabled, children, testId, className, ...rest }, ref) => {
   return (
     <button
       ref={ref}
@@ -133,8 +182,15 @@ export const CommitBarButton = forwardRef<
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "rounded-[9px] px-4 py-3 text-sm font-semibold transition-colors disabled:opacity-40",
-        VARIANTS[variant]
+        // px-3 below sm, px-4 above: four controls don't fit a 390px row at the wider padding, and
+        // the 8px per button is the cheapest place to find the space. Vertical padding is untouched,
+        // so every button stays exactly 44px tall at both breakpoints.
+        // whitespace-nowrap: without it a cramped row silently breaks "Copy Link" across two lines
+        // and grows the pill to 60px instead of overflowing, which hides the problem rather than
+        // showing it.
+        "flex items-center justify-center whitespace-nowrap rounded-[9px] px-3 py-3 text-sm font-semibold transition-colors disabled:opacity-40 sm:px-4",
+        VARIANTS[variant],
+        className
       )}
       data-testid={testId}
       {...rest}

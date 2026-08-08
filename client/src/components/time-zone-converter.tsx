@@ -438,14 +438,28 @@ export function TimeZoneConverter({ isCustomMode, selectedTime, onTimeUpdate, on
     onShareModeChange?.(shareMode);
   }, [shareMode, onShareModeChange]);
 
-  // Esc exits select mode (matches the bottom bar's Cancel) — unless the Sharing Options popover is
-  // open, in which case Escape belongs to the popover and tearing down the whole bar underneath it
-  // would be a surprise. Radix also stops propagation on its side; this guard is the belt to that
-  // brace, and covers the frame between the popover closing and `shareOptionsOpen` catching up.
+  // Esc exits select mode (matches the bottom bar's Cancel) — but with the Sharing Options popover
+  // open it belongs to the popover, and tearing down the whole bar underneath it would be a
+  // surprise. That precedence is decided *here* rather than left to Radix.
+  //
+  // Radix's DismissableLayer only dismisses on Escape when it believes it is the highest layer, and
+  // that bookkeeping is unreliable in this app: once a few Popovers have opened and closed (every
+  // tile carries a ⋯ menu), `isHighestLayer` comes back false and Radix never even calls
+  // `onEscapeKeyDown`. The popover then stayed open *and*, because this listener used to bail
+  // whenever it was open, Escape did nothing at all. Verified against a296754, so it predates the
+  // animation work — the earlier spec passed on ordering luck.
+  //
+  // When Radix does dismiss, its capture-phase handler stops propagation and this never runs; when
+  // it doesn't, this closes the popover. Either way exactly one thing happens per keypress.
   useEffect(() => {
-    if (!shareMode || shareOptionsOpen) return;
+    if (!shareMode) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") cancelShareMode();
+      if (e.key !== "Escape") return;
+      if (shareOptionsOpen) {
+        setShareOptionsOpen(false);
+        return;
+      }
+      cancelShareMode();
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);

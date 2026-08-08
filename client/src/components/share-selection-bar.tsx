@@ -45,8 +45,11 @@ export function ShareSelectionBar({
 }: ShareSelectionBarProps) {
   const canShare = count > 0;
 
+  // singleRow: the left slot here is a button, not the sentence the other two bars carry, so it can
+  // share a row with the actions. On phones the trigger collapses to a gear to make that fit —
+  // spelled out, it forced the bar to wrap.
   return (
-    <CommitBar testId="share-selection-bar">
+    <CommitBar testId="share-selection-bar" singleRow>
       {/* Replaced the lone "Include Happyhour link" checkbox (2026-08-08). That checkbox governed
           one of three things that shape a share; the other two were being read off the Sidebar,
           where they describe the user's own board instead. */}
@@ -57,7 +60,7 @@ export function ShareSelectionBar({
         onChange={onChangeShareOptions}
       />
 
-      <CommitBarActions>
+      <CommitBarActions singleRow>
         {/* Reads "Done", not "Cancel": leaving select-mode keeps the board exactly as it was, so
             there is nothing to cancel. The testId keeps its original name. */}
         <CommitBarButton variant="ghost" onClick={onCancel} testId="button-share-cancel">
@@ -69,7 +72,15 @@ export function ShareSelectionBar({
           disabled={!canShare}
           testId="button-share-copy"
         >
-          {linkCopied ? "Copied" : "Copy Link"}
+          {/* "Copy" on phones, "Copy Link" from sm up. Measured: at the full label a 16-city share
+              is 313px wide against a 360px Android's 310px, so the row overflowed on the commonest
+              small screen. Dropping one word buys ~35px and clears every phone from 360 up. */}
+          {linkCopied ? "Copied" : (
+            <>
+              <span className="sm:hidden">Copy</span>
+              <span className="hidden sm:inline">Copy Link</span>
+            </>
+          )}
         </CommitBarButton>
         {canNativeShare && (
           <CommitBarButton variant="primary" onClick={onShare} disabled={!canShare} testId="button-share-commit">

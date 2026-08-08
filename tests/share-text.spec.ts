@@ -192,14 +192,23 @@ test.describe("the Sharing Options popover", () => {
   test("Escape closes the popover without leaving share select-mode", async ({ page }) => {
     // The page has a document-level Escape listener that tears down the whole bar. Same family as
     // the time-picker Escape interaction guarded in time-picker.spec.ts.
+    //
+    // Opened and closed twice on purpose. Radix only dismisses on Escape while it believes its
+    // layer is the highest, and that belief decays as Popovers come and go — so a single-open
+    // version of this test passed on ordering luck while Escape was in fact dead on the second
+    // instance. The reopen is the case that actually bites a user.
     await shareAllThree(page);
-    await openShareOptions(page);
+    for (const attempt of [1, 2]) {
+      await openShareOptions(page);
+      await page.keyboard.press("Escape");
+      await expect(
+        page.getByTestId("sharing-options-popover"),
+        `Escape should close the popover on open #${attempt}`
+      ).toBeHidden();
+      await expect(bar(page)).toBeVisible();
+    }
 
-    await page.keyboard.press("Escape");
-    await expect(page.getByTestId("sharing-options-popover")).toBeHidden();
-    await expect(bar(page)).toBeVisible();
-
-    // And a second Escape, with the popover already shut, still leaves select-mode as before.
+    // And with the popover shut, Escape goes back to meaning "leave select-mode".
     await page.keyboard.press("Escape");
     await expect(bar(page)).toBeHidden();
   });

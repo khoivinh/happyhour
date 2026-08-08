@@ -153,3 +153,111 @@ test.describe("Copy Link", () => {
     await expect(page.getByTestId("button-share-commit")).toBeDisabled();
   });
 });
+
+/** The bar has to hold a single row on a phone. It used to wrap: the "Sharing Options" trigger is
+ *  ~141px spelled out, which pushed Done / Copy Link / Share onto a second line. The trigger now
+ *  collapses to a gear below `sm` and Copy Link shortens to "Copy".
+ *
+ *  Measured worst case is a 16-city share, where the primary button reads "Share 16" — the widest
+ *  the bar ever gets. At the full labels that was 313px against a 360px Android's 310px, so the
+ *  narrow guard below uses 360, not 390: 390 passed even while 360 was broken. */
+const SIXTEEN = [
+  "paris_FR", "tokyo_JP", "newYorkCity_US", "london_GB", "berlin_DE", "madrid_ES", "rome_IT",
+  "moscow_RU", "dubai_AE", "singapore_SG", "sydney_AU", "seoul_KR", "mumbai_IN", "cairo_EG",
+  "lagos_NG", "lima_PE",
+];
+
+test.describe("the commit bar on a phone", () => {
+  test("holds one row at its widest, with nothing overflowing", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await enterSelectMode(page, SIXTEEN, true);
+    for (const key of SIXTEEN.slice(1)) await page.getByTestId(`clock-tile-${key}`).click();
+    await expect(page.getByTestId("button-share-commit")).toHaveText("Share 16");
+
+    // Same row, asserted by vertical centre rather than by bar height: a wrapped bar whose buttons
+    // happened to be short would still pass a height check, and `whitespace-nowrap` means a cramped
+    // row overflows instead of growing. Centres are what actually prove one row.
+    const trigger = (await page.getByTestId("button-sharing-options").boundingBox())!;
+    const share = (await page.getByTestId("button-share-commit").boundingBox())!;
+    expect(Math.abs((trigger.y + trigger.height / 2) - (share.y + share.height / 2))).toBeLessThan(1);
+    // ...and the gear is exactly as tall as the buttons beside it.
+    expect(trigger.height).toBe(share.height);
+
+    const fit = await bar(page).evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+    expect(fit.scroll).toBeLessThanOrEqual(fit.client);
+  });
+
+  test("shows the gear on a phone and the words on a desktop", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await enterSelectMode(page, ["tokyo_JP", "paris_FR"], true);
+    const trigger = page.getByTestId("button-sharing-options");
+    const copy = page.getByTestId("button-share-copy");
+
+    // innerText, not toHaveText: both labels are always in the DOM and swapped with `hidden`/
+    // `sm:inline`, so textContent-based matchers see both at every width. innerText is what the
+    // user actually reads.
+    await expect(trigger).toHaveAttribute("aria-label", "Sharing Options");
+    expect(await trigger.innerText()).toBe("");
+    await expect(trigger.locator("svg")).toBeVisible();
+    expect(await copy.innerText()).toBe("Copy");
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    expect(await trigger.innerText()).toBe("Sharing Options");
+    await expect(trigger.locator("svg")).toBeHidden();
+    expect(await copy.innerText()).toBe("Copy Link");
+  });
+
+  test("reserves footer clearance from the bar's real height, not a constant", async ({ page }) => {
+    // The clearance used to be a hardcoded desktop/mobile pair. It can't be: this bar is one row on
+    // a phone while the Sharing View's and Registration bars still stack. Enter once and resize —
+    // re-running the whole entry would look for a cookie banner that's already been answered.
+    await page.setViewportSize({ width: 360, height: 800 });
+    await enterSelectMode(page, ["tokyo_JP", "paris_FR"], true);
+    for (const width of [360, 1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      await expect(bar(page)).toBeVisible();
+      const height = (await bar(page).boundingBox())!.height;
+      const pad = await page.evaluate(() => parseFloat(getComputedStyle(document.body).paddingBottom));
+      expect(pad).toBeGreaterThanOrEqual(height);
+      // ...and not wildly more than it: a stale constant would show up as slack here.
+      expect(pad).toBeLessThan(height + 40);
+    }
+  });
+});
+
+test.describe("the Sharing Options popover animation", () => {
+  test("stays mounted to play its exit animation", async ({ page }) => {
+    // Guards a specific trap. Radix's `usePresence` reads getAnimationName() from the Content node
+    // itself and gates animationend on `event.target === node`; with the animation on a descendant,
+    // Content reports "none", Radix unmounts synchronously, and the dismissal never plays — which is
+    // exactly what shipped the first time. If the animation migrates off Content again, the node is
+    // gone by the time this reads it.
+    await enterSelectMode(page, ["tokyo_JP", "paris_FR"], true);
+    await page.getByTestId("button-sharing-options").click();
+    await expect(page.getByTestId("sharing-options-popover")).toBeVisible();
+
+    await page.getByTestId("button-sharing-options").click();
+    const exiting = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="sharing-options-popover"]');
+      if (!el) return null;
+      return { state: el.getAttribute("data-state"), anim: getComputedStyle(el).animationName };
+    });
+    expect(exiting).not.toBeNull();
+    expect(exiting!.state).toBe("closed");
+    expect(exiting!.anim).not.toBe("none");
+  });
+
+  test("grows from the pointer tail, not a corner", async ({ page }) => {
+    await enterSelectMode(page, ["tokyo_JP", "paris_FR"], true);
+    await page.getByTestId("button-sharing-options").click();
+    const origin = await page
+      .getByTestId("sharing-options-popover")
+      .evaluate((el) => getComputedStyle(el).transformOrigin);
+    // Radix resolves --radix-popover-content-transform-origin to the point where the content meets
+    // the trigger — i.e. the tail. An unresolved var would compute as the box's own centre.
+    const [x, y] = origin.split(" ").map(parseFloat);
+    const box = (await page.getByTestId("sharing-options-popover").boundingBox())!;
+    expect(y).toBeGreaterThan(box.height - 2); // bottom edge, where the tail is
+    expect(Math.abs(x - box.width / 2)).toBeGreaterThan(1); // not the default centre
+  });
+});

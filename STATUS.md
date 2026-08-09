@@ -1,6 +1,6 @@
 # Happyhour — Status
 
-Last updated: 2026-08-05
+Last updated: 2026-08-08
 
 **Status:** In progress · **Live:** <https://happyhour.day> · **Stack:** Vite + React 18 + TS + Tailwind, static (Cloudflare Pages, auto-deploys on push) · **Repo:** `khoivinh/happyhour`
 

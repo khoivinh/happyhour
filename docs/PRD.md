@@ -1,15 +1,15 @@
 # Happyhour — Product Requirements Document
 
-*Last updated 2026-07-14.*
+*Last updated 2026-08-09.*
 
 ## Context
 
 Happyhour (formerly Khlock) is a world clock and timezone converter web app (React/TypeScript/Tailwind, deployed on Cloudflare Pages at `happyhour.day` — note the Pages **project** is still named `khlock`, which couldn't be renamed in place, so branch previews are `<branch>.khlock.pages.dev`). Phases 1-2 (codebase cleanup, deployment, mobile UX fixes) are complete.
 
-**Track 1 (Web) is feature-complete** as of 2026-07-14; what remains is a maintenance tail (see Recommended Next Steps). Tracks 2 and 3 are specified but **not started**. This PRD covers three tracks:
+**Track 1 (Web) is feature-complete** as of 2026-07-14; what remains is a maintenance tail (see Recommended Next Steps). **Track 3 (Sharing) shipped** across 2026-07 and 2026-08. **Track 2 (iOS) is specified but not started** — it was rewritten 2026-08-09 and is the only track with work left in it. This PRD covers three tracks:
 
 1. **Phase 3: UI Revisions + Cloud Sync** — revise clock tile interactions, hero clock, city menu, drag-and-drop, and add user accounts with cloud-synced preferences
-2. **iOS Native App** — SwiftUI app with feature parity + home/lock screen widgets + cloud sync
+2. **iOS Native App** — SwiftUI app with feature parity + widgets + App Intents/Shortcuts + cloud sync
 3. **Sharing** — let users share a selection of clocks (and, when in custom-time mode, a specific moment) via a link that opens a transient view on `happyhour.day`
 
 **Status (2026-03-26):** Most Track 1 UI revisions are complete. Cloud sync (Clerk auth + Cloudflare Worker + D1) shipped 2026-03-25 using the Clerk dev instance (production instance requires a custom domain — see Backlog). Relative time offset feature and AM/PM sizing shipped 2026-03-26. Cross-device sync bug fixed 2026-03-26 — replaced union merge with cloud-wins strategy plus timestamp guard to prevent deleted zones from resurrecting on other devices. App rename voting form created via Google Forms. Several bug fixes and polish items remain before Track 1 is complete.
@@ -312,91 +312,278 @@ Shipped in one batch on 2026-04-22: #1, #2, #3, #4→guard, #5, #6, #9. #7 neede
 
 ## Track 2: iOS Native App
 
+*Rewritten 2026-08-09. The previous version of this track was written around 2026-03, before most of
+the current product existed — it specified a "1500-city dataset," three appearance modes, min iOS 17,
+an invented folder tree, and said nothing about App Intents. `docs/2026-07-27-ios-app-scoping.md`
+audited it and concluded that anyone starting from it "would build the wrong app," recommending
+replacement rather than amendment. This is that replacement.*
+
+**This section states what must be true. The scoping doc holds the reasoning** — why native rather
+than a WKWebView wrapper or Capacitor, what each alternative costs, and the day-level effort
+estimates. Deliberately not duplicated here: two documents restating each other in different words
+is how the last one went stale.
+
+### Status and decisions taken
+
+| Decision | Value |
+|---|---|
+| Built? | **No.** No Xcode project, no `ios/` directory, nothing scheduled |
+| Distribution | Public App Store release |
+| Minimum iOS | **18.0** — buys `ControlWidget` and modern App Intents, keeps ~2 years of device reach |
+| Language / UI | Swift 6 · SwiftUI |
+| Code location | `ios/` inside this repo. The repo is public and the Swift source would be too; there are no secrets in it (the Clerk publishable key is public by design) |
+
 ### Goal
-Build a native SwiftUI iOS app with full feature parity to the web app, plus home screen and Lock Screen widgets. Share user accounts and synced preferences with the web app.
 
-### Core Features (Parity with Web)
+Full parity with the web app as it actually stands, plus the two things a native app can do that the
+web cannot: **widgets** and **App Intents / Shortcuts**. Accounts and synced preferences are shared
+with the web app, so the same board appears on both.
 
-1. **World Clock Display**
-   - Hero clock showing local timezone with large digital time
-   - Additional clocks grid (reorderable, grid layout only)
-   - Live time with seconds display
-   - Custom time mode (tap to edit, "Reset Time" text link to return to live)
+### Parity target
 
-2. **City Management**
-   - Search and add cities (same 1500-city dataset from city-timezones)
-   - Full-width search menu with "Already displayed" status for duplicate cities
-   - Remove cities (ellipsis menu → confirmation)
-   - Drag-to-reorder with left-side drop indicator
-   - Max 16 clocks (matching web)
-   - Cloud sync of city list and order via Clerk account (cross-platform with web)
+The real scope, as shipped. Larger than the previous Track 2 assumed.
 
-3. **Weather Integration**
-   - Temperature display per city via Open-Meteo API (free, no auth)
-   - Color-coded temperature
+| Area | What must be reproduced |
+|---|---|
+| **Board** | Up to **16** tiles plus a sticky **hero** clock. New users start with **zero** clocks (`time-zone-converter.tsx:296` — pre-seeding was removed 2026-07-19, and an empty stored array is honored rather than re-seeded) |
+| **Hero** | City name, large time **with seconds**, AM/PM, GMT label, temperature `xx°F / yy°C` colour-banded, or "Weather Unavailable". "Reset Time" appears in custom mode. No picker, no menu, no drag |
+| **Hero city detection** | `Intl`/`TimeZone` match first, then upgraded to the nearest city by geolocation — a haversine scan over the full dataset (`closest-city.ts:12`), cached 24 h (`closest-city.ts:4`). Falls back to `london_GB` when denied |
+| **Tile** | Drag grip, city-name button opening a per-tile search picker, time, AM/PM, zone label, optional pill (**relative offset** `+9HR` / `+10.5HR` and/or **Next Day / Prev Day**), temperature, ellipsis menu (Share / Remove + confirm) |
+| **Custom time** | Tap any time → inline editor → every clock freezes to that instant; seconds and weather hide |
+| **Reorder** | Drag to reorder. Manual reorder auto-disables Sort East-to-West |
+| **Board settings** | Appearance (System / Light / Dark / **Happy**), 24-Hour Clock, Sort East-to-West, Relative Time, Time Zone Names (**default ON**). No temperature-unit setting — both °F and °C always show |
+| **Share settings** | A **separate** set of three — see "The settings model is split in two" below |
+| **Sharing** | Select mode → `https://happyhour.day/?z=key1,key2&t=<epochMs>` (`time-zone-converter.tsx:489`); `t` only when a custom time is frozen |
+| **Sharing View** | Receiving `?z=` replaces the board entirely: headline, select/resting modes, grey locked checks for already-owned cities, "Add N" commit bar, Reset Time / Restore Custom Time |
+| **Accounts** | Clerk; sync of zones, four toggles and theme via `GET/PUT /api/preferences`, `DELETE /api/account` |
+| **Weather** | Open-Meteo, no key, per city, 10-minute stale window, 3 retries backing off to 8 s (`use-weather.ts:26-33`) |
+| **Secondary** | `/about`, `/privacy`, `/support`, 404; offline banner; cookie consent; GA4 — see the open question on analytics |
 
-4. **Day Indicator**
-   - "Next Day" / "Prev Day" badge on tiles where displayed time is a different calendar day
+Size of the thing being ported: 47 files, ~5,900 lines in `client/src`, plus the CSS carrying four
+theme blocks.
 
-5. **Appearance**
-   - Light/dark/system theme support
-   - Minimal, clean design matching web app aesthetic
-   - Smooth animations and transitions
+### Binding constraints
 
-### iOS-Specific Features
+Three requirements that shape the architecture. Each is a place where the obvious implementation is
+silently wrong.
 
-6. **Home Screen Widgets**
-   - Small widget: single city clock + weather
-   - Medium widget: 2-3 city clocks
-   - Large widget: up to 6 city clocks
-   - Configurable city selection per widget
+#### 1. The city-key contract — the highest-risk item in the project
 
-7. **Lock Screen Widgets**
-   - Inline widget: single city time
-   - Circular widget: city abbreviation + time
-   - Rectangular widget: city + time + weather
+Share links, saved boards, and the D1 `zones` column all key off strings like `tokyo_JP` and
+`newYorkCity_US`. **That key is generated at runtime from the dataset, not stored in it** — by
+`buildLookup()` (`client/src/lib/city-lookup.ts:454`), which walks population-sorted rows maintaining
+a `usedKeys` set and appends `_{state_ansi || province}`, then the last IANA path segment, on
+collision. **Any row's key therefore depends on every row before it**, and **333 of 30,481 rows
+collide on the base key** — the disambiguation branches are load-bearing, not edge-case handling.
 
-### Technical Architecture
+A Swift reimplementation differing in Unicode handling of `[^a-zA-Z0-9]` or in sort stability would
+silently remap some of those 333, producing dead share links, wrong cities restored from D1, and a
+corrupted `zones` array on the next `PUT`. Nothing would throw.
 
-- **Language:** Swift 6
-- **UI Framework:** SwiftUI
-- **Minimum iOS:** 17.0 (for latest widget APIs)
-- **Data Persistence:** SwiftData or UserDefaults + App Groups (for widget data sharing)
-- **Networking:** URLSession + async/await for Open-Meteo API and sync API
-- **City Database:** Bundle the city-timezones dataset as JSON, load at launch
-- **Widget Framework:** WidgetKit with TimelineProvider
-- **Cloud Sync:** Clerk iOS SDK for auth + Cloudflare Workers API (shared with web)
+- **Requirement: never re-derive keys in Swift.** A build script (`scripts/build-ios-cities.mjs`,
+  following the existing `scripts/build-*.mjs` + `npm run build:*` pattern) imports the *real*
+  `buildLookup` and emits keys into the shipped database. One source of truth, not a port.
+- **Requirement: a SHA-256 golden fixture** over the sorted key list, asserted by a JS test *and* a
+  Swift test that re-hashes the shipped database. Any dataset change that moves one key fails both
+  builds. This also catches a latent hazard in the algorithm itself: there is no third fallback and
+  `usedKeys.add(key)` runs unconditionally, so a three-way collision introduced by a future GeoNames
+  refresh would have two cities silently share a key and one vanish from `byKey`.
+- **Requirement: port the 18 legacy key mappings** in `migrateOldKeys()`
+  (`time-zone-converter.tsx:255`) — `paris` → `paris_FR`, plus the `newYork_US` → `newYorkCity_US`
+  fix — or existing saved boards break on first launch.
 
-### Project Structure (Proposed)
-```
-Happyhour/
-├── HappyhourApp/
-│   ├── App/                       # App entry, navigation
-│   ├── Models/                    # City, Clock, Weather models
-│   ├── Views/
-│   │   ├── WorldClockView         # Main screen
-│   │   ├── ClockTileView          # Individual clock tile
-│   │   ├── HeroClockView          # Large hero clock
-│   │   └── CitySearchView         # City search/add
-│   ├── ViewModels/                # ObservableObject view models
-│   ├── Services/
-│   │   ├── WeatherService         # Open-Meteo API client
-│   │   ├── SyncService            # Cloudflare Workers API client for preference sync
-│   │   └── CityDatabase           # City lookup & search
-│   └── Resources/
-│       └── cities.json            # Bundled city database
-├── HappyhourWidgets/
-│   ├── HappyhourWidgets.swift     # Widget bundle
-│   ├── HomeScreenWidget.swift     # Small/Medium/Large
-│   └── LockScreenWidget.swift     # Inline/Circular/Rectangular
-└── Shared/
-    └── Models/                 # Shared between app & widgets
-```
+#### 2. The widget memory ceiling makes the module split a firewall
 
-### Phased Delivery (iOS)
-1. **MVP:** World clock display, city search, add/remove, drag-to-reorder
-2. **V1.0:** Weather integration, day indicator badges, custom time mode, theme support, cloud sync
-3. **V1.1:** Home screen & Lock Screen widgets
+Widget extensions run under a hard ceiling of roughly 30 MB. The 30,481-row dataset must be
+**structurally unreachable** from the widget target — enforced at the package-product boundary, not
+by convention, and asserted against the widget's link map.
+
+#### 3. A widget cannot custom-render ticking seconds
+
+`Text(date, style: .time)` self-updates without consuming a reload and honours
+`.environment(\.timeZone,)`, but yields system time formatting rather than the app's typography.
+**Widgets are therefore minute-resolution; seconds stay in-app** via `TimelineView(.periodic)`.
+
+### The settings model is split in two
+
+*Added 2026-08-08 — this postdates the scoping doc and is easy to collapse by accident.*
+
+The web app has **two independent groups of preferences**, and iOS must reproduce the split rather
+than merging them:
+
+| Group | Settings | Storage |
+|---|---|---|
+| **Board** — describe your own view | zones, 24-Hour Clock, Sort East-to-West, Relative Time, Time Zone Names, appearance | localStorage **and** cloud-synced (`api/src/routes/preferences.ts:5-10`) |
+| **Share** — describe the outgoing message | 24-Hour Clock, Time Zone Name, Happyhour Link | localStorage **only** (`world-happyhour-share-{24h,zone-abbr,link}`) — deliberately absent from the D1 schema |
+
+The two groups have separate 24-hour and zone-name toggles with **different defaults**: the board
+shows zone names by default, a share does not. Collapsing them re-creates exactly the coupling the
+2026-08-08 round existed to break — tailoring what a recipient sees would mean changing your own
+dashboard.
+
+### Two lookup tables that must be ported verbatim
+
+Both are curated editorial content, not derivable, and both need golden fixtures generated from the
+JS source:
+
+| Table | Size | Applies to |
+|---|---|---|
+| `ZONE_ABBR` (`city-lookup.ts:154`) | **46** entries covering Europe / Asia / Oceania; North America is delegated to `Intl` short names with anything matching `GMT*`/`UTC*` rejected | Tile and hero zone labels. Foundation's abbreviations differ from `Intl`'s, so this cannot be delegated to the platform |
+| `CITY_ABBR` (`city-lookup.ts:256`) | **168** curated three-letter city names, via `shareCityName()` | **Share text only.** Tiles, the preview card and the OG image stay spelled out. Any iOS-composed share text must match, or the same board shares differently from the two platforms |
+
+### Data and storage
+
+**Dataset: SQLite + FTS5**, ~3.5 MB on disk, ~0.5 MB mmap. FTS5's `unicode61 remove_diacritics 2`
+reproduces the web's diacritic folding for free. Store `key, name, name_ascii, tz_id, iso2, province,
+state_ansi, lat, lng, pop, rank`. Do **not** bake `offset` or `gmtLabel` — they are DST-dependent and
+must come from `TimeZone` at runtime.
+
+This deletes complexity rather than porting it. The entire tiered lazy-load scheme
+(`cities-top.json`, `loadTopCities`/`loadCities`, `didFullCitiesFail()`, and the
+`happyhour:tile-cache` workaround) exists solely to dodge a 2 MB parse in a browser. None of it
+survives the move.
+
+**Shared store: App Group `group.com.designdept.happyhour`.** The design is the direct analogue of
+the web's `tile-cache.ts` — resolved city metadata is **denormalized into the snapshot**, so no
+consumer needs the city database to render.
+
+| Artifact | Writer | Readers |
+|---|---|---|
+| Settings scalars | app | app, widget, intents |
+| `board.json` — `{key, name, tzID, iso2, lat, lng, order}` | app, `AddCity`/`RemoveCity` intents | widget, intents |
+| `weather.json` — `{key: {tempC, fetchedAt}}` | app; widget on reload if stale | widget, intents |
+| Clerk session | app | intents (Keychain, shared access group) |
+
+Rules: coordinate writes with `NSFileCoordinator`; merge `weather.json` **per key by `fetchedAt`**
+rather than clobbering the file; debounce `WidgetCenter.reloadAllTimelines()`. The widget's render
+path is `board.json` → `TimeZone(identifier:)` → text — **zero database access, zero network**.
+
+### Widgets
+
+Reload budget is roughly 40–70/day. The correct pattern is **many pre-computed entries per reload**
+(Apple suggests up to 24 h). Entries are only needed where *non-self-updating* content changes: each
+zone's local midnight (Next/Prev Day flips) and DST transitions — roughly 8–30 entries/day.
+
+| Family | Shows |
+|---|---|
+| `systemSmall` | One city: name, time, zone label, temperature, day badge |
+| `systemMedium` | Three cities |
+| `systemLarge` | Six cities, 2×3 |
+| `systemExtraLarge` (iPad) | 8–12 cities |
+| `accessoryInline` / `accessoryCircular` / `accessoryRectangular` | Lock Screen: 1–2 cities |
+| StandBy | `systemSmall` with a clear container background; night tint via rendering mode |
+| `ControlWidget` (iOS 18) | Control Center / Action Button: one city's time, or open-at-city |
+
+**Custom-time mode must deliberately not propagate to widgets.** A frozen home-screen clock reads as
+a bug, not a feature. The accessory families make watchOS complications near-free later — out of
+scope for v1, but the reason to build them properly now.
+
+### App Intents and Shortcuts
+
+Absent from the previous Track 2 entirely, and the higher-leverage half of what a native app buys.
+
+**The keystone: one `CityEntity` serves four surfaces at once** — widget configuration, Shortcuts
+parameter pickers, Siri natural-language resolution, and Spotlight. Hosting its `EntityQuery` in a
+separate App Intents extension is what lets widget configuration search all 30,481 cities while the
+widget process itself stays under its memory ceiling.
+
+| Entity | Backed by |
+|---|---|
+| `CityEntity` (`EntityStringQuery`) | SQLite FTS5, in the intents extension |
+| `BoardSlotEntity` (a city on your board) | `board.json` only — no database |
+| `ThemeAppEnum`, `SettingAppEnum` | Settings |
+
+| Intent | Parameters | Returns |
+|---|---|---|
+| `GetTimeInCity` | city, optional instant | Date + spoken dialog + snippet |
+| `ConvertTime` | time, from-city, to-city | Date (chains into other actions) |
+| `GetTemperature` | city | `Measurement<UnitTemperature>` |
+| `AddCity` / `RemoveCity` | city / board slot | Board slot; throws at the 16 cap |
+| `ShareBoard` | cities + the three share settings | **URL** — the `?z=` link |
+| `SetCustomTime` / `ResetTime` | time | — |
+| `SetAppearance` / `ToggleSetting` | enum, bool | — |
+| `ShowBoard` | optional focus city | Opens the app |
+| `RefreshWeather` | — | Widget button; doesn't launch the app |
+
+`AppShortcutsProvider` gives zero-setup Siri phrases (cap 10; use ~4). **`ShareBoard` returning a URL
+is the one that makes the app composable** — it drops straight into a Shortcut that messages the
+link. Spotlight should index board cities plus the top few hundred, never all 30,481.
+
+### Targets and modules
+
+XcodeGen `ios/project.yml`, mirroring the `Shotglass/mac/project.yml` pattern — same commit-count
+`CURRENT_PROJECT_VERSION`, same `ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME` trick for app-wide
+brand tint. That project is also the precedent for ClerkKit, which it already ships.
+
+| Target | Type | Links |
+|---|---|---|
+| `Happyhour` | app | Core, Store, UI, CityDB, Networking, ClerkKit |
+| `HappyhourWidgets` | widget extension | **Core, Store, UI only** |
+| `HappyhourIntents` | App Intents extension | Core, Store, CityDB |
+| `HappyhourKitTests` | unit tests | all |
+
+A local package `ios/HappyhourKit` with five products:
+
+| Product | Contents |
+|---|---|
+| `Core` | Models, zone-label logic, offset / relative-offset / day-badge math, temperature colour bands, design tokens (4 themes), bundled fonts |
+| `Store` | App Group reader/writer behind a protocol |
+| `UI` | Widget-safe SwiftUI: clock face, tile, temperature pill, day badge |
+| `CityDB` | SQLite wrapper + the city dataset — **app and intents extension only** |
+| `Networking` | Open-Meteo client, sync client, Clerk token plumbing |
+
+Fonts are bundleable: **Zalando Sans is SIL OFL 1.1** (weights 600/900 for numerals), Inter for UI.
+
+**Foundation deletes a whole layer.** The web app's timezone stack is hand-rolled over
+`Intl.DateTimeFormat` — offset parsing by regex, DST detection by comparing offsets at two instants,
+arithmetic `Date` shifting to render another zone. `TimeZone` and `DateFormatter` replace all of it.
+There is no date library to port because the web app has none.
+
+### Phasing
+
+| # | Phase | Days | Needs paid account? |
+|---|---|---|---|
+| 0 | XcodeGen scaffold, package split, SQLite pipeline, **key golden test**, zone/city abbreviation fixtures | 3–5 | No |
+| 1 | Board UI: hero, tiles, search, drag-reorder, settings, 4 themes, fonts | 6–9 | No |
+| 2 | Weather, custom-time mode, sharing + Sharing View | 5–7 | Deep links yes; **Universal Links no** |
+| 3 | App Group store + widget extension: system, accessory, StandBy | 5–8 | **Likely — see below** |
+| 4 | App Intents extension, entities, intent suite, widget config, Spotlight | 4–6 | No |
+| 5 | ClerkKit auth + preferences sync | 4–6 | No |
+| 6 | `ControlWidget`, accessibility, polish, TestFlight, submission | 5–8 | **Yes** |
+
+**32–49 focused days — roughly 7–10 weeks**, with something demoable at the end of phase 1 (~2 weeks).
+
+**The external dependency.** As of **2026-07-29**, Apple Organization enrollment `R63L8BG6UB` was
+*submitted, unpaid and unverified*, with an unresolved D-U-N-S address risk. That status came from
+`Code/Shotglass/STATUS.md`, **which no longer exists at that path** — re-confirm before scheduling
+phases 3 or 6 rather than trusting this line. Until it activates, phases 0–2, 4 and 5 can all proceed
+on the free Personal Team `ZZV3GKQGG9`. **If widgets turn out to be blocked, run phase 4 before phase
+3** — App Intents need no special entitlement.
+
+### Risks
+
+| Risk | Mitigation |
+|---|---|
+| **City-key drift** silently breaks share links, saved boards, and D1 rows | Generate keys by importing the real `buildLookup`; SHA-256 golden fixture asserted in both test suites |
+| **Widget OOM** via a transitive link to the city database | Enforce at the SPM product boundary; assert the widget's link map excludes it |
+| **Sync corrupts web preferences** — `show_zone_abbr` NULL must read `true` (`preferences.ts:33`), and `theme: "happy"` must round-trip | Non-optional decode defaults; never `PUT` a partial row; contract tests against local `wrangler d1` covering NULL columns and all four themes |
+| **Abbreviation drift** — `ZONE_ABBR` or `CITY_ABBR` diverging between platforms | Port both verbatim; golden tests over all zones × 4 seasonal dates, and over the full 168-entry city map, against JS-generated fixtures |
+| **Geolocation UX** — a privacy disclosure and a first-run friction point the web handles with a footer hint | Make it explicitly optional; fall back to `TimeZone.current` |
+
+### Open questions — flagged, not answered
+
+- **Does a free Personal Team support App Groups?** Sources conflict. This decides whether widget work
+  can start before the org account activates, so it is worth **15 minutes of empirical test**: new
+  throwaway project, Personal Team, add the App Groups capability, see whether it signs. Do not plan
+  around either answer until then.
+- **Analytics.** GA4 + Silktide consent has no clean native equivalent. Drop it, replace it with
+  something privacy-preserving, or skip analytics on iOS? Affects the App Privacy questionnaire.
+- **Sign in with Apple.** Guideline 4.8 requires offering it once third-party social login is offered.
+  Clerk supports it; it must be turned on deliberately.
+- **Seconds on the hero.** Keep them (a per-second render costs battery) or drop them for parity with
+  the widget? A design call.
+- **Should iOS compose share text at all**, or only produce the URL? Composing it pulls in `CITY_ABBR`
+  and the three share settings; producing only the URL avoids both.
 
 ---
 
@@ -419,6 +606,8 @@ Let any user generate a link that shares a subset of their clocks — and, when 
 6. **Exit** — Copying the link, triggering `navigator.share`, pressing Escape, or tapping `Cancel` exits share mode.
 
 ### Share URL structure
+
+> ⚠️ **Stale as of 2026-08-09 — this section describes a `/s` route and a `share.tsx` page that were never built.** Sharing shipped on the **root route** (`https://happyhour.day/?z=…&t=…`, built at `time-zone-converter.tsx:489`), with `t` as epoch milliseconds rather than ISO 8601, and the recipient experience is the Sharing View rather than a transient `/s` session. The design intent below still reads true; the mechanics do not. Left in place because Track 3 has shipped and this is now history — but **do not build against it**, particularly the iOS Universal Link in v1.2.
 
 Client-encoded, stateless. No backend in v1.
 
@@ -485,7 +674,7 @@ Example (custom-time meeting share): `https://happyhour.day/s?z=paris_FR,newYork
 
 1. **v1.0** — Share mode + copy-link + transient view + Save CTA (live-mode shares only)
 2. **v1.1** — Frozen-moment shares via `?t=` (requires custom-time plumbing already in the app)
-3. **v1.2** — iOS deep-link (after Track 2 ships) — `happyhour.day/s` URLs open the iOS app if installed, fall through to web if not
+3. **v1.2** — iOS deep-link (after Track 2 ships) — share URLs open the iOS app if installed, fall through to web if not. **The path is `happyhour.day/?z=…`, not `/s`** *(corrected 2026-08-09)*: sharing shipped on the root route, so a Universal Link configured for `/s` would match nothing
 4. **v2.0** — Dynamic OG images + optional short IDs (if usage justifies a backend)
 
 ---
@@ -523,13 +712,19 @@ Example (custom-time meeting share): `https://happyhour.day/s?z=paris_FR,newYork
 - Deploy to https://happyhour.day/ and test on real device
 
 ### iOS (Track 2)
-- Run in Xcode Simulator (iPhone 15 Pro, iPhone SE)
-- Test widget rendering in widget gallery
-- Verify Open-Meteo API calls work on device
-- Test drag-to-reorder with haptic feedback
-- Test light/dark mode transitions
-- Sign in with same account as web, verify same cities appear
-- Test offline behavior (local changes sync when back online)
+
+*Rewritten 2026-08-09 alongside the track itself. The previous list was generic simulator advice; these are the gates that actually catch the failure modes this app has.*
+
+- **Key parity is the gate, and it blocks everything else.** The SHA-256 fixture over the sorted key list must pass in both the JS and Swift suites **before any UI work starts**. A mismatch here is silent — dead share links and wrong cities restored from D1, with nothing thrown
+- Zone-abbreviation and relative-offset golden tests against JS-generated fixtures, including sub-hour zones (`+5.5HR`, `+10.5HR`)
+- City-abbreviation parity: all 168 `CITY_ABBR` entries, and the fall-through to the full name for the other 30,313
+- Round-trip a `?z=…&t=…` link **web → iOS → web** and confirm identical city sets — and that a board with a custom time survives the `t` parameter
+- Confirm the settings split holds: changing a **share** setting on iOS must not alter the board, and must not appear in a `PUT /api/preferences` body
+- Sync contract tests against a local `wrangler d1`, explicitly covering a NULL `show_zone_abbr` (must read `true`) and all four themes including `happy`
+- Widget memory-limit snapshot test; assert the widget target's link map excludes `CityDB`
+- Confirm a widget timeline survives a DST transition in a zone that has one, and that custom-time mode does **not** reach the widget
+- Real-device QA — the Simulator does not exercise widget reload budgets or StandBy
+- Sign in with the same account as web; verify the same board appears
 
 ### Sharing (Track 3)
 - Enter share mode from the sidebar; confirm hero is pre-selected and other tiles start unselected
@@ -565,7 +760,7 @@ Example (custom-time meeting share): `https://happyhour.day/s?z=paris_FR,newYork
 
 ### Then — pick a track
 9. **Track 3 (Sharing)** is the cheaper of the two: it's web-only, needs no backend in v1, and is already specified in detail below
-10. **Track 2 (iOS native app)**, using the finished web app as the reference design
+10. **Track 2 (iOS native app)** — rewritten 2026-08-09 against the product as it actually stands; `docs/2026-07-27-ios-app-scoping.md` holds the supporting analysis. Two things gate it: re-confirming the Apple Organization enrollment (the status quoted in Track 2 is from 2026-07-29 and its source file is gone), and the 15-minute Personal-Team/App-Groups test that decides whether widget work can start early
 
 ### Housekeeping
 - `docs/` contains ~10 iCloud duplicate files (`… 2.md`). Harmless, but worth a sweep
